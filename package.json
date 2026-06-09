@@ -1,0 +1,29 @@
+﻿{
+  "name": "ai-workflow-frontend",
+  "version": "1.0.0",
+  "description": "AI Workflow Frontend - Unified entry point for data visualization and AI workflow chains",
+  "private": true,
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie": "^0.6.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mysql2": "^3.11.5",
+    "redis": "^4.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "ai",
+    "workflow",
+    "visualization",
+    "express"
+  ]
+}
