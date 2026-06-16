@@ -12,7 +12,7 @@
       <main class="auth-panel">
         <section class="login-card">
           <div class="auth-header">
-            <span class="micro">AI WORKFLOW FRONTEND</span>
+            <span class="micro">人工智能工作链前端</span>
           </div>
           <div class="tabs" role="tablist">
             <button class="tab is-active" type="button" data-auth-tab="login">登录</button>
@@ -24,9 +24,9 @@
             <div class="field">
               <label>进入系统</label>
               <select id="entrySystem" data-entry-system>
-                <option value="raw">原始数据</option>
-                <option value="text">文本工作链</option>
-                <option value="video">视频工作链</option>
+                <option value="data">数据展示</option>
+                <option value="text">文本AI任务链</option>
+                <option value="video">视频AI任务链</option>
               </select>
             </div>
             <button class="primary-btn" type="submit">登录</button>
@@ -39,14 +39,14 @@
             <div class="field">
               <label>进入系统</label>
               <select id="entrySystemReg" data-entry-system-reg>
-                <option value="raw">原始数据</option>
-                <option value="text">文本工作链</option>
-                <option value="video">视频工作链</option>
+                <option value="data">数据展示</option>
+                <option value="text">文本AI任务链</option>
+                <option value="video">视频AI任务链</option>
               </select>
             </div>
             <button class="primary-btn" type="submit">注册并进入</button>
           </form>
-          <button class="ghost-btn" type="button" data-guest>游客进入原始数据</button>
+          <button class="ghost-btn" type="button" data-guest>游客登录</button>
           <p class="form-message" data-auth-message></p>
         </section>
       </main>
@@ -56,53 +56,73 @@
       <aside class="sidebar">
         <div class="sidebar-top">
           <div class="brand hide-when-collapsed">
-            <strong data-i18n="brandTitle">AI Workflow</strong>
-            <span data-i18n="brandSubtitle" class="micro">智能工作链平台</span>
+            <strong>人工智能工作链前端</strong>
+            <span class="micro">数据展示平台</span>
           </div>
           <button class="icon-btn" type="button" data-sidebar-toggle title="收放侧边栏">☰</button>
         </div>
 
-        <div class="panel-section hide-when-collapsed">
-          <div class="field">
-            <label for="globalLang">语言 / Language</label>
-            <select id="globalLang" data-global-lang>
-              <option value="zh">中文</option>
-              <option value="en">English</option>
-            </select>
-          </div>
-        </div>
-
         <div class="panel-section hide-when-collapsed" data-theme-section>
-          <button class="theme-btn" type="button" data-theme-toggle>
+          <button class="theme-icon-btn" type="button" data-theme-toggle title="切换主题">
             <span data-theme-icon>☀</span>
-            <span data-theme-label data-i18n="themeLight">白天</span>
           </button>
         </div>
 
-        <div class="panel-section hide-when-collapsed" data-dataset-section>
-          <h2 data-i18n="dataSection">数据源</h2>
-          <div class="field">
-            <label for="dataset" data-i18n="datasetLabel">数据集</label>
-            <select id="dataset" data-dataset></select>
+        <div class="panel-section hide-when-collapsed" data-config-section>
+          <h2>数据源配置</h2>
+          <div class="config-box">
+            <div class="field">
+              <label for="dataSource">数据源</label>
+              <select id="dataSource" data-data-source>
+                <option value="">请选择</option>
+              </select>
+            </div>
+            <div class="field" data-language-field>
+              <label for="dataLanguage">语言</label>
+              <select id="dataLanguage" data-data-language disabled>
+                <option value="">请先选择数据源</option>
+              </select>
+            </div>
+            <div class="field" data-display-type-field>
+              <label for="displayType">展示类型</label>
+              <select id="displayType" data-display-type disabled>
+                <option value="">请选择</option>
+                <option value="cards">节点详情</option>
+                <option value="graph">网络拓扑</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        <div class="panel-section hide-when-collapsed" data-filter-section>
-          <h2 data-i18n="filterSection">筛选器</h2>
+        <div class="panel-section hide-when-collapsed is-hidden" data-graph-filter-section>
+          <h2>筛选器</h2>
 
-          <div class="field" data-view-mode="cards">
-            <label for="search" data-i18n="searchLabel">搜索</label>
-            <input id="search" data-search type="text" placeholder="中文、英文或 ID" />
+          <div class="field">
+            <label for="sizeMode">节点大小</label>
+            <select id="sizeMode" data-size-mode>
+              <option value="uniform">统一大小</option>
+              <option value="degree">按度大小</option>
+            </select>
           </div>
 
-          <div class="filter-group is-hidden" data-view-mode="graph">
-            <div class="filter-group-title" data-i18n="focusGroupTitle">辐射筛选</div>
+          <div class="field">
+            <label for="layout">布局方式</label>
+            <select id="layout" data-layout>
+              <option value="radial">辐射布局</option>
+              <option value="force">力导向</option>
+              <option value="circle">环形布局</option>
+              <option value="columns">分列布局</option>
+            </select>
+          </div>
+
+          <div class="filter-group" data-focus-group>
+            <div class="filter-group-title">辐射筛选</div>
             <div class="field">
-              <label for="focusNode" data-i18n="focusNodeLabel">中心节点</label>
+              <label for="focusNode">中心节点</label>
               <select id="focusNode" data-focus-node></select>
             </div>
             <div class="field">
-              <label for="focusDepth" data-i18n="focusDepthLabel">辐射层数</label>
+              <label for="focusDepth">辐射层数</label>
               <select id="focusDepth" data-focus-depth>
                 <option value="1">1 层</option>
                 <option value="2">2 层</option>
@@ -113,75 +133,54 @@
             </div>
           </div>
 
-          <div class="filter-group is-hidden" data-view-mode="graph">
-            <div class="filter-group-title" data-i18n="pathGroupTitle">路径查找</div>
+          <div class="filter-group" data-path-group>
+            <div class="filter-group-title">最短路径</div>
             <div class="field">
-              <label for="pathSource" data-i18n="pathSourceLabel">起点</label>
+              <label for="pathSource">起点</label>
               <select id="pathSource" data-path-source></select>
             </div>
             <div class="field">
-              <label for="pathTarget" data-i18n="pathTargetLabel">终点</label>
+              <label for="pathTarget">终点</label>
               <select id="pathTarget" data-path-target></select>
             </div>
           </div>
-
-          <div class="field is-hidden" data-view-mode="graph">
-            <label for="sizeMode" data-i18n="sizeModeLabel">节点大小</label>
-            <select id="sizeMode" data-size-mode>
-              <option value="degree" data-i18n="sizeDegree">按连接数</option>
-              <option value="uniform" data-i18n="sizeUniform">统一大小</option>
-            </select>
-          </div>
-
-          <div class="field is-hidden" data-view-mode="graph">
-            <label for="layout" data-i18n="layoutLabel">布局方式</label>
-            <select id="layout" data-layout>
-              <option value="radial" data-i18n="layoutRadial">辐射布局</option>
-              <option value="force" data-i18n="layoutForce">力导向</option>
-              <option value="circle" data-i18n="layoutCircle">环形布局</option>
-              <option value="columns" data-i18n="layoutColumns">分列布局</option>
-            </select>
-          </div>
-
-          <div class="field is-hidden" data-view-mode="graph">
-            <label for="lang" data-i18n="languageLabel">节点语言</label>
-            <select id="lang" data-lang>
-              <option value="zh">中文</option>
-              <option value="en">English</option>
-            </select>
-          </div>
         </div>
 
-        <div class="panel-section hide-when-collapsed" data-view-toggle-section>
-          <button class="theme-btn" type="button" data-view-toggle>
-            <span data-view-icon>📊</span>
-            <span data-view-label data-i18n="switchToGraph">切换到关系图</span>
-          </button>
+        <div class="panel-section hide-when-collapsed is-hidden" data-cards-filter-section>
+          <h2>筛选器</h2>
+          <div class="field">
+            <label for="search">搜索</label>
+            <input id="search" data-search type="text" placeholder="中文、英文或 ID" />
+          </div>
         </div>
 
         <div class="panel-section hide-when-collapsed">
-          <button class="theme-btn" type="button" data-logout data-i18n="logoutLabel">退出登录</button>
+          <button class="theme-btn" type="button" data-logout>退出登录</button>
         </div>
       </aside>
 
       <main class="main">
-        <header class="page-header">
+        <header class="page-header" data-main-header>
           <div class="page-title">
-            <h1 data-page-title>原始数据</h1>
-            <p data-status>加载中...</p>
+            <h1 data-page-title>数据展示</h1>
+            <p data-status></p>
           </div>
           <div class="stats" data-stats-section>
-            <div class="stat"><b data-total>0</b><span data-i18n="statTotal">节点</span></div>
-            <div class="stat"><b data-visible>0</b><span data-i18n="statVisible">显示</span></div>
-            <div class="stat"><b data-edges>0</b><span data-i18n="statEdges">关系</span></div>
+            <div class="stat"><b data-total>0</b><span>节点</span></div>
+            <div class="stat"><b data-visible>0</b><span>显示</span></div>
+            <div class="stat"><b data-edges>0</b><span>关系</span></div>
           </div>
         </header>
 
-        <section id="characterGrid" class="grid" data-view="cards"></section>
+        <section id="characterGrid" class="grid is-hidden" data-view="cards"></section>
 
         <section class="graph-wrap is-hidden" data-view="graph">
           <canvas id="graphCanvas"></canvas>
         </section>
+
+        <div class="empty-page" data-empty-page>
+          <p class="empty-hint">请从左侧选择数据源并配置展示方式</p>
+        </div>
 
         <div class="floating-related-panel" data-floating-panel>
           <h4 data-floating-title>相关角色</h4>
@@ -189,42 +188,14 @@
         </div>
 
         <section class="workflow-section is-hidden" data-view="text">
-          <div class="workflow-header">
-            <button class="primary-btn" type="button" data-start-text-workflow>启动 AI 文本工作流</button>
-          </div>
-          <div class="workflow-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>_id</th>
-                  <th>详情</th>
-                </tr>
-              </thead>
-              <tbody data-text-tasks>
-              </tbody>
-            </table>
+          <div class="empty-page">
+            <p class="dev-notice">还在开发中</p>
           </div>
         </section>
 
         <section class="workflow-section is-hidden" data-view="video">
-          <div class="workflow-header">
-            <div class="workflow-controls">
-              <input type="text" placeholder="请输入 _id" data-video-id-input />
-              <button class="primary-btn" type="button" data-start-video-workflow>启动 AI 视频工作流</button>
-              <button class="ghost-btn" type="button" data-download-video>下载视频</button>
-            </div>
-          </div>
-          <div class="workflow-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>_id</th>
-                  <th>详情</th>
-                </tr>
-              </thead>
-              <tbody data-video-tasks>
-              </tbody>
-            </table>
+          <div class="empty-page">
+            <p class="dev-notice">还在开发中</p>
           </div>
         </section>
       </main>

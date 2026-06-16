@@ -1,178 +1,46 @@
 const state = {
   user: null,
-  page: 'raw',
-  view: 'cards',
-  dataset: 'genshin',
-  data: { nodes: [], edges: [] },
-  lang: localStorage.getItem('ai-workflow-lang') || (navigator.language?.startsWith('zh') ? 'zh' : 'en'),
+  page: 'data',
+  view: null,
+  dataSource: '',
+  dataLanguage: '',
+  displayType: '',
+  dataLoaded: false,
+  data: { nodes: [], edges: [], has_english: false, has_chinese: false },
   filters: {
     query: '',
-    sort: 'name',
     focusNodeId: '',
     focusDepth: 1,
     pathSourceId: '',
     pathTargetId: '',
-    sizeMode: 'degree',
+    sizeMode: 'uniform',
     layout: 'radial'
   }
 };
 
-const PAGE_TEXT = {
-  zh: {
-    brandTitle: 'AI Workflow',
-    brandSubtitle: '智能工作链平台',
-    themeDark: '夜间',
-    themeLight: '白天',
-    dataSection: '数据源',
-    datasetLabel: '数据集',
-    filterSection: '筛选器',
-    searchLabel: '搜索',
-    focusGroupTitle: '辐射筛选',
-    focusNodeLabel: '中心节点',
-    focusDepthLabel: '辐射层数',
-    pathGroupTitle: '路径查找',
-    pathSourceLabel: '起点',
-    pathTargetLabel: '终点',
-    sizeModeLabel: '节点大小',
-    sizeDegree: '按连接数',
-    sizeUniform: '统一大小',
-    layoutLabel: '布局方式',
-    layoutRadial: '辐射布局',
-    layoutForce: '力导向',
-    layoutCircle: '环形布局',
-    layoutColumns: '分列布局',
-    languageLabel: '节点语言',
-    langZh: '中文',
-    langEn: 'English',
-    pageSection: '功能导航',
-    rawLink: '原始数据',
-    textLink: '文本工作链',
-    videoLink: '视频工作链',
-    logoutLabel: '退出登录',
-    statTotal: '节点',
-    statVisible: '显示',
-    statEdges: '关系',
-    switchToGraph: '切换到关系图',
-    switchToCards: '切换到卡片',
-    pageTitleRaw: '原始数据',
-    pageTitleText: '文本工作链',
-    pageTitleVideo: '视频工作链',
-    empty: '没有找到匹配数据',
-    noRelated: '暂无相关角色',
-    idLabel: 'ID',
-    connections: '连接',
-    relatedTitle: '相关角色',
-    selectAll: '不限',
-    loadedStatus: '已加载 {nodes} 个节点与 {edges} 条关系。',
-    focusStatus: '当前显示 {name} 辐射 {depth} 层的相关节点。',
-    pathStatus: '当前显示从 {source} 到 {target} 的有向路径，共 {steps} 步。',
-    pathMissingStatus: '从 {source} 到 {target} 没有找到有向路径。',
-    inDegree: '入度',
-    outDegree: '出度',
-    totalDegree: '总计',
-    relationLabel: '关系',
-    relationTitle: '{source} 到 {target} 的关系',
-    unknown: '未知',
-    importPrompt: '请从左侧选择数据集加载数据。',
-    textWorkflowTitle: 'AI 文本工作流',
-    textWorkflowButton: '启动 AI 文本工作流',
-    videoWorkflowTitle: 'AI 视频工作流',
-    videoIdPlaceholder: '请输入 _id',
-    videoStartButton: '启动 AI 视频工作流',
-    videoDownloadButton: '下载视频',
-    apiNotReady: '接口暂未接入，请稍后再试',
-    pleaseEnterId: '请输入 _id',
-    sidebarToggle: '收放侧边栏'
-  },
-  en: {
-    brandTitle: 'AI Workflow',
-    brandSubtitle: 'Intelligent Workflow Platform',
-    themeDark: 'Dark',
-    themeLight: 'Light',
-    dataSection: 'Data Source',
-    datasetLabel: 'Dataset',
-    filterSection: 'Filters',
-    searchLabel: 'Search',
-    focusGroupTitle: 'Focus Filter',
-    focusNodeLabel: 'Center Node',
-    focusDepthLabel: 'Hop Count',
-    pathGroupTitle: 'Path Finder',
-    pathSourceLabel: 'Source',
-    pathTargetLabel: 'Target',
-    sizeModeLabel: 'Node Size',
-    sizeDegree: 'By Degree',
-    sizeUniform: 'Uniform',
-    layoutLabel: 'Layout',
-    layoutRadial: 'Radial',
-    layoutForce: 'Force-Directed',
-    layoutCircle: 'Circle',
-    layoutColumns: 'Columns',
-    languageLabel: 'Language',
-    langZh: 'Chinese',
-    langEn: 'English',
-    pageSection: 'Navigation',
-    rawLink: 'Raw Data',
-    textLink: 'Text Chain',
-    videoLink: 'Video Chain',
-    logoutLabel: 'Logout',
-    statTotal: 'Nodes',
-    statVisible: 'Visible',
-    statEdges: 'Edges',
-    switchToGraph: 'Switch to Graph',
-    switchToCards: 'Switch to Cards',
-    pageTitleRaw: 'Raw Data',
-    pageTitleText: 'Text Chain',
-    pageTitleVideo: 'Video Chain',
-    empty: 'No matching data found',
-    noRelated: 'No related nodes',
-    idLabel: 'ID',
-    connections: 'Connections',
-    relatedTitle: 'Related Nodes',
-    selectAll: 'All',
-    loadedStatus: 'Loaded {nodes} nodes and {edges} edges.',
-    focusStatus: 'Showing nodes within {depth} hops from {name}.',
-    pathStatus: 'Showing directed path from {source} to {target} with {steps} steps.',
-    pathMissingStatus: 'No directed path found from {source} to {target}.',
-    inDegree: 'In-degree',
-    outDegree: 'Out-degree',
-    totalDegree: 'Total',
-    relationLabel: 'Relation',
-    relationTitle: 'Relation from {source} to {target}',
-    unknown: 'Unknown',
-    importPrompt: 'Select a dataset from the left panel.',
-    textWorkflowTitle: 'AI Text Workflow',
-    textWorkflowButton: 'Start AI Text Workflow',
-    videoWorkflowTitle: 'AI Video Workflow',
-    videoIdPlaceholder: 'Enter _id',
-    videoStartButton: 'Start AI Video Workflow',
-    videoDownloadButton: 'Download Video',
-    apiNotReady: 'API not ready, please try again later',
-    pleaseEnterId: 'Please enter _id',
-    sidebarToggle: 'Toggle sidebar'
-  }
-};
+const DATASOURCES = new Map([
+  ['genshin', { nameZh: '原神', apiUrl: '/api/network/genshin' }]
+]);
 
-const UI_TEXT = {
-  zh: { unknown: '未知', invalidJson: 'JSON 需要包含 nodes 和 edges 数组', importPrompt: '请从左侧选择数据集加载数据。' },
-  en: { unknown: 'Unknown', invalidJson: 'JSON must contain nodes and edges arrays', importPrompt: 'Select a dataset from the left panel.' }
-};
-
-const DATASETS = {
-  genshin: {
-    nameZh: '原神',
-    nameEn: 'Genshin',
-    apiUrl: '/api/network/genshin'
-  },
-  scp: {
-    nameZh: 'SCP 基金会',
-    nameEn: 'SCP Foundation',
-    apiUrl: '/api/network/scp'
-  },
-  backrooms: {
-    nameZh: '后室',
-    nameEn: 'Backrooms',
-    apiUrl: '/api/network/backrooms'
-  }
+const DATA_TEXT = {
+  empty: '没有找到匹配数据',
+  noRelated: '暂无相关角色',
+  idLabel: 'ID',
+  connections: '连接',
+  relatedTitle: '相关角色',
+  selectAll: '不限',
+  loadedStatus: '已加载 {nodes} 个节点与 {edges} 条关系。',
+  focusStatus: '当前显示 {name} 辐射 {depth} 层的相关节点。',
+  pathStatus: '当前显示从 {source} 到 {target} 的有向路径，共 {steps} 步。',
+  pathMissingStatus: '从 {source} 到 {target} 没有找到有向路径。',
+  inDegree: '入度',
+  outDegree: '出度',
+  totalDegree: '总计',
+  relationLabel: '关系',
+  relationTitle: '{source} 到 {target} 的关系',
+  unknown: '未知',
+  importPrompt: '请从左侧选择数据集加载数据。',
+  emptyHint: '请从左侧选择数据源并配置展示方式'
 };
 
 const app = {
@@ -231,10 +99,9 @@ async function boot() {
   initDom();
   bindShell();
   bindAuth();
-  await loadDataset(state.dataset);
   const me = await api('/api/auth/me');
   if (me.user) {
-    state.page = me.user.lastPage || 'raw';
+    state.page = me.user.lastPage || 'data';
     enterApp(me.user);
   }
 }
@@ -254,27 +121,29 @@ function initDom() {
     edges: qs('[data-edges]'),
     pageTitle: qs('[data-page-title]'),
     search: qs('[data-search]'),
-    lang: qs('[data-lang]'),
-    globalLang: qs('[data-global-lang]'),
     focusNode: qs('[data-focus-node]'),
     focusDepth: qs('[data-focus-depth]'),
     pathSource: qs('[data-path-source]'),
     pathTarget: qs('[data-path-target]'),
     sizeMode: qs('[data-size-mode]'),
     layout: qs('[data-layout]'),
-    dataset: qs('[data-dataset]'),
+    dataSource: qs('[data-data-source]'),
+    dataLanguage: qs('[data-data-language]'),
+    displayType: qs('[data-display-type]'),
+    languageField: qs('[data-language-field]'),
+    displayTypeField: qs('[data-display-type-field]'),
+    configSection: qs('[data-config-section]'),
+    graphFilterSection: qs('[data-graph-filter-section]'),
+    cardsFilterSection: qs('[data-cards-filter-section]'),
+    emptyPage: qs('[data-empty-page]'),
+    mainHeader: qs('[data-main-header]'),
     floatingPanel: qs('[data-floating-panel]'),
     floatingTitle: qs('[data-floating-title]'),
     floatingContent: qs('[data-floating-content]'),
-    viewToggle: qs('[data-view-toggle]'),
-    viewIcon: qs('[data-view-icon]'),
-    viewLabel: qs('[data-view-label]'),
-    tooltip: qs('#tooltip'),
-    textTasks: qs('[data-text-tasks]'),
-    videoTasks: qs('[data-video-tasks]'),
-    videoIdInput: qs('[data-video-id-input]')
+    tooltip: qs('#tooltip')
   };
 
+  populateDataSourceOptions();
   generateAuthBgText();
 }
 
@@ -313,62 +182,127 @@ function bindShell() {
     app.dom.authScreen?.classList.remove('is-hidden');
   });
 
-  qs('[data-view-toggle]')?.addEventListener('click', () => {
-    if (state.page !== 'raw') return;
-    state.view = state.view === 'cards' ? 'graph' : 'cards';
-    updateViewToggleButton();
-    updateFilterVisibility();
-    renderPage();
-  });
+  app.dom.dataSource?.addEventListener('change', handleDataSourceChange);
+  app.dom.dataLanguage?.addEventListener('change', handleLanguageChange);
+  app.dom.displayType?.addEventListener('change', handleDisplayTypeChange);
+}
 
-  app.dom.lang?.addEventListener('change', (event) => {
-    state.lang = event.target.value;
-    localStorage.setItem('ai-workflow-lang', state.lang);
-    if (app.dom.globalLang) app.dom.globalLang.value = state.lang;
-    updateDatasetOptions();
-    rebuildNodeSelects();
-    applyTranslations();
-    renderPage();
+function populateDataSourceOptions() {
+  const select = app.dom.dataSource;
+  if (!select) return;
+  select.innerHTML = '<option value="">请选择</option>';
+  DATASOURCES.forEach((config, key) => {
+    const option = document.createElement('option');
+    option.value = key;
+    option.textContent = config.nameZh;
+    select.appendChild(option);
   });
+}
 
-  qs('[data-global-lang]')?.addEventListener('change', (event) => {
-    state.lang = event.target.value;
-    localStorage.setItem('ai-workflow-lang', state.lang);
-    if (app.dom.lang) app.dom.lang.value = state.lang;
-    updateDatasetOptions();
-    rebuildNodeSelects();
-    applyTranslations();
+async function handleDataSourceChange(event) {
+  const sourceKey = event.target.value;
+  state.dataSource = sourceKey;
+  state.dataLanguage = '';
+  state.displayType = '';
+  state.dataLoaded = false;
+  state.view = null;
+
+  // 禁用语言和展示类型下拉框
+  if (app.dom.dataLanguage) {
+    app.dom.dataLanguage.setAttribute('disabled', '');
+    app.dom.dataLanguage.innerHTML = '<option value="">请先选择数据源</option>';
+  }
+  if (app.dom.displayType) {
+    app.dom.displayType.setAttribute('disabled', '');
+    app.dom.displayType.value = '';
+  }
+
+  if (!sourceKey) {
     renderPage();
-  });
+    return;
+  }
+
+  const config = DATASOURCES.get(sourceKey);
+  if (!config) return;
+
+  try {
+    const response = await fetch(config.apiUrl);
+    const data = await response.json();
+    state.data = normalizeData(data);
+    populateLanguageOptions();
+    // 启用语言下拉框
+    app.dom.dataLanguage?.removeAttribute('disabled');
+    renderPage();
+  } catch (error) {
+    console.error('Failed to load data source:', error);
+    state.data = { nodes: [], edges: [], has_english: false, has_chinese: false };
+  }
+}
+
+function populateLanguageOptions() {
+  const select = app.dom.dataLanguage;
+  if (!select) return;
+
+  select.innerHTML = '';
+  const { has_chinese, has_english } = state.data;
+
+  if (has_chinese) {
+    const option = document.createElement('option');
+    option.value = 'zh';
+    option.textContent = '中文';
+    select.appendChild(option);
+  }
+  if (has_english) {
+    const option = document.createElement('option');
+    option.value = 'en';
+    option.textContent = 'English';
+    select.appendChild(option);
+  }
+
+  if (has_chinese) {
+    state.dataLanguage = 'zh';
+    select.value = 'zh';
+  } else if (has_english) {
+    state.dataLanguage = 'en';
+    select.value = 'en';
+  }
+}
+
+function handleLanguageChange(event) {
+  state.dataLanguage = event.target.value;
+  // 启用展示类型下拉框
+  app.dom.displayType?.removeAttribute('disabled');
+  // 更新节点下拉框的显示名称
+  rebuildNodeSelects();
+  renderPage();
+}
+
+function handleDisplayTypeChange(event) {
+  state.displayType = event.target.value;
+  state.view = state.displayType || null;
+
+  if (state.displayType === 'graph') {
+    app.dom.graphFilterSection?.classList.remove('is-hidden');
+    app.dom.cardsFilterSection?.classList.add('is-hidden');
+  } else if (state.displayType === 'cards') {
+    app.dom.graphFilterSection?.classList.add('is-hidden');
+    app.dom.cardsFilterSection?.classList.remove('is-hidden');
+  } else {
+    app.dom.graphFilterSection?.classList.add('is-hidden');
+    app.dom.cardsFilterSection?.classList.add('is-hidden');
+  }
+
+  if (state.displayType && state.data.nodes.length > 0) {
+    state.dataLoaded = true;
+    rebuildIndexes();
+    rebuildNodeSelects();
+  }
+  renderPage();
 }
 
 function updateThemeButton() {
   const dark = document.documentElement.classList.contains('dark');
   qsa('[data-theme-icon]').forEach((item) => (item.textContent = dark ? '☾' : '☀'));
-  qsa('[data-theme-label]').forEach((item) => (item.textContent = t(dark ? 'themeDark' : 'themeLight')));
-}
-
-function updateViewToggleButton() {
-  if (state.view === 'cards') {
-    app.dom.viewIcon.textContent = '📊';
-    app.dom.viewLabel.textContent = t('switchToGraph');
-  } else {
-    app.dom.viewIcon.textContent = '📋';
-    app.dom.viewLabel.textContent = t('switchToCards');
-  }
-}
-
-function updateFilterVisibility() {
-  const isCards = state.view === 'cards';
-  const isRaw = state.page === 'raw';
-
-  qsa('[data-view-mode="cards"]').forEach((el) => {
-    el.classList.toggle('is-hidden', !isCards || !isRaw);
-  });
-
-  qsa('[data-view-mode="graph"]').forEach((el) => {
-    el.classList.toggle('is-hidden', isCards || !isRaw);
-  });
 }
 
 function bindAuth() {
@@ -386,35 +320,11 @@ function applyAuthTranslations() {
   const registerBtn = qs('[data-auth-form="register"] .primary-btn');
   const guestBtn = qs('[data-guest]');
 
-  if (loginTab) loginTab.textContent = state.lang === 'zh' ? '登录' : 'Login';
-  if (registerTab) registerTab.textContent = state.lang === 'zh' ? '注册' : 'Register';
-  if (loginBtn) loginBtn.textContent = state.lang === 'zh' ? '登录' : 'Login';
-  if (registerBtn) registerBtn.textContent = state.lang === 'zh' ? '注册并进入' : 'Register';
-  if (guestBtn) guestBtn.textContent = state.lang === 'zh' ? '游客登录' : 'Guest Login';
-
-  const entryLabels = qsa('[data-entry-system], [data-entry-system-reg]');
-  entryLabels.forEach((select) => {
-    const options = select.querySelectorAll('option');
-    options.forEach((opt) => {
-      if (opt.value === 'raw') opt.textContent = state.lang === 'zh' ? '原始数据' : 'Raw Data';
-      if (opt.value === 'text') opt.textContent = state.lang === 'zh' ? '文本工作链' : 'Text Chain';
-      if (opt.value === 'video') opt.textContent = state.lang === 'zh' ? '视频工作链' : 'Video Chain';
-    });
-  });
-}
-
-function updateDatasetOptions() {
-  const select = app.dom.dataset;
-  if (!select) return;
-
-  select.innerHTML = '';
-  Object.entries(DATASETS).forEach(([key, dataset]) => {
-    const option = document.createElement('option');
-    option.value = key;
-    option.textContent = state.lang === 'zh' ? dataset.nameZh : dataset.nameEn;
-    select.appendChild(option);
-  });
-  select.value = state.dataset;
+  if (loginTab) loginTab.textContent = '登录';
+  if (registerTab) registerTab.textContent = '注册';
+  if (loginBtn) loginBtn.textContent = '登录';
+  if (registerBtn) registerBtn.textContent = '注册并进入';
+  if (guestBtn) guestBtn.textContent = '游客登录';
 }
 
 function selectAuthTab(name) {
@@ -426,7 +336,7 @@ function selectAuthTab(name) {
 function onLogin(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
-  const entrySystem = qs('[data-entry-system]')?.value || 'raw';
+  const entrySystem = qs('[data-entry-system]')?.value || 'data';
   state.page = entrySystem;
   submitAuth(() => api('/api/auth/login', { method: 'POST', body: JSON.stringify(Object.fromEntries(form)) }));
 }
@@ -434,13 +344,13 @@ function onLogin(event) {
 function onRegister(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
-  const entrySystem = qs('[data-entry-system-reg]')?.value || 'raw';
+  const entrySystem = qs('[data-entry-system-reg]')?.value || 'data';
   state.page = entrySystem;
   submitAuth(() => api('/api/auth/register', { method: 'POST', body: JSON.stringify(Object.fromEntries(form)) }));
 }
 
 function onGuest() {
-  state.page = 'raw';
+  state.page = 'data';
   submitAuth(() => api('/api/auth/guest', { method: 'POST' }));
 }
 
@@ -459,52 +369,48 @@ function enterApp(user) {
   app.dom.authScreen?.classList.add('is-hidden');
   app.dom.appShell?.classList.remove('is-hidden');
 
-  if (app.dom.globalLang) app.dom.globalLang.value = state.lang;
-  if (app.dom.lang) app.dom.lang.value = state.lang;
-
-  updateDatasetOptions();
-
-  bindDatasetSelect();
   bindFilters();
-  bindWorkflowButtons();
   bindCanvasEvents();
-  applyTranslations();
   renderPage();
   requestAnimationFrame(animationLoop);
 }
 
 function renderPage() {
-  updateViewToggleButton();
-  updateFilterVisibility();
-  applyTranslations();
-
   qsa('[data-view]').forEach((el) => el.classList.add('is-hidden'));
+  app.dom.emptyPage?.classList.remove('is-hidden');
+  app.dom.mainHeader?.classList.add('is-hidden');
 
-  if (state.page === 'raw') {
-    qs(`[data-view="${state.view}"]`)?.classList.remove('is-hidden');
-    qs('[data-view-toggle-section]')?.classList.remove('is-hidden');
-    qs('[data-filter-section]')?.classList.remove('is-hidden');
-    qs('[data-stats-section]')?.classList.remove('is-hidden');
-    qs('[data-dataset-section]')?.classList.remove('is-hidden');
-    qs('[data-theme-section]')?.classList.remove('is-hidden');
+  if (state.page === 'data') {
+    app.dom.pageTitle.textContent = '数据展示';
 
-    if (state.view === 'cards') renderCardsView();
-    if (state.view === 'graph') renderGraphView();
+    if (state.dataLoaded && state.view) {
+      app.dom.emptyPage?.classList.add('is-hidden');
+      app.dom.mainHeader?.classList.remove('is-hidden');
+      qs(`[data-view="${state.view}"]`)?.classList.remove('is-hidden');
+
+      if (state.view === 'cards') renderCardsView();
+      if (state.view === 'graph') renderGraphView();
+    } else {
+      app.dom.status.textContent = '';
+      app.dom.total.textContent = '0';
+      app.dom.visible.textContent = '0';
+      app.dom.edges.textContent = '0';
+    }
   } else if (state.page === 'text') {
+    app.dom.pageTitle.textContent = '文本AI任务链';
     qs('[data-view="text"]')?.classList.remove('is-hidden');
-    qs('[data-view-toggle-section]')?.classList.add('is-hidden');
-    qs('[data-filter-section]')?.classList.add('is-hidden');
-    qs('[data-stats-section]')?.classList.add('is-hidden');
-    qs('[data-dataset-section]')?.classList.add('is-hidden');
-    qs('[data-theme-section]')?.classList.remove('is-hidden');
+    app.dom.emptyPage?.classList.add('is-hidden');
+    app.dom.configSection?.classList.add('is-hidden');
+    app.dom.graphFilterSection?.classList.add('is-hidden');
+    app.dom.cardsFilterSection?.classList.add('is-hidden');
     app.dom.status.textContent = '';
   } else if (state.page === 'video') {
+    app.dom.pageTitle.textContent = '视频AI任务链';
     qs('[data-view="video"]')?.classList.remove('is-hidden');
-    qs('[data-view-toggle-section]')?.classList.add('is-hidden');
-    qs('[data-filter-section]')?.classList.add('is-hidden');
-    qs('[data-stats-section]')?.classList.add('is-hidden');
-    qs('[data-dataset-section]')?.classList.add('is-hidden');
-    qs('[data-theme-section]')?.classList.remove('is-hidden');
+    app.dom.emptyPage?.classList.add('is-hidden');
+    app.dom.configSection?.classList.add('is-hidden');
+    app.dom.graphFilterSection?.classList.add('is-hidden');
+    app.dom.cardsFilterSection?.classList.add('is-hidden');
     app.dom.status.textContent = '';
   }
 }
@@ -528,10 +434,7 @@ function matchesFilters(node) {
 }
 
 function compareNodes(a, b) {
-  if (state.filters.sort === 'degree') {
-    return (app.cards.index.degreeById.get(b.vid) || 0) - (app.cards.index.degreeById.get(a.vid) || 0);
-  }
-  const locale = state.lang === 'zh' ? 'zh-Hans-CN' : 'en';
+  const locale = state.dataLanguage === 'zh' ? 'zh-Hans-CN' : 'en';
   return getName(a).localeCompare(getName(b), locale);
 }
 
@@ -541,13 +444,13 @@ function updateStats(visibleNodes) {
   app.dom.visible.textContent = visibleNodes.length;
   app.dom.edges.textContent = state.data.edges?.length || 0;
   app.dom.status.textContent = allNodes.length
-    ? formatText(t('loadedStatus'), { nodes: allNodes.length, edges: state.data.edges?.length || 0 })
-    : uiText('importPrompt');
+    ? formatText(DATA_TEXT.loadedStatus, { nodes: allNodes.length, edges: state.data.edges?.length || 0 })
+    : DATA_TEXT.emptyHint;
 }
 
 function renderGrid(nodes) {
   if (!nodes.length) {
-    app.dom.grid.innerHTML = `<div class="empty">${escapeHtml(t('empty'))}</div>`;
+    app.dom.grid.innerHTML = `<div class="empty">${escapeHtml(DATA_TEXT.empty)}</div>`;
     return;
   }
 
@@ -577,8 +480,8 @@ function renderCharacterCard(node) {
         <h3>${escapeHtml(getName(node))}</h3>
         <p>${escapeHtml(getOtherName(node))}</p>
         <div class="chips">
-          <span class="chip">${escapeHtml(t('idLabel'))}: ${escapeHtml(node.vid)}</span>
-          <span class="chip">${escapeHtml(t('connections'))} ${degree}</span>
+          <span class="chip">ID: ${escapeHtml(node.vid)}</span>
+          <span class="chip">连接 ${degree}</span>
         </div>
       </div>
     </article>
@@ -663,7 +566,7 @@ function syncFloatingPanel() {
     return;
   }
 
-  if (app.dom.floatingTitle) app.dom.floatingTitle.textContent = t('relatedTitle');
+  if (app.dom.floatingTitle) app.dom.floatingTitle.textContent = DATA_TEXT.relatedTitle;
   if (app.dom.floatingContent) app.dom.floatingContent.innerHTML = renderRelatedList(activeId);
   updatePanelVisibility(true);
   app.dom.floatingPanel?.classList.toggle('is-pinned', app.cards.panel.pinnedId === activeId);
@@ -673,7 +576,7 @@ function syncFloatingPanel() {
 function renderRelatedList(characterId) {
   const relatedList = app.cards.index.relatedById.get(characterId) || [];
   if (!relatedList.length) {
-    return `<div class="related-empty">${escapeHtml(t('noRelated'))}</div>`;
+    return `<div class="related-empty">${escapeHtml(DATA_TEXT.noRelated)}</div>`;
   }
 
   return `
@@ -686,7 +589,7 @@ function renderRelatedList(characterId) {
 function renderRelatedItem({ node, edge, direction }) {
   const label = direction === 'out' ? edgeEndpoint(edge, 'target') : edgeEndpoint(edge, 'source');
   const relation = getRelationText(edge);
-  const fallback = `${t('idLabel')}: ${node.vid}`;
+  const fallback = `ID: ${node.vid}`;
   return `
     <button class="related-item" type="button" data-related-jump data-target-id="${escapeHtml(node.vid)}">
       <strong>${escapeHtml(label || getName(node))}</strong>
@@ -938,7 +841,7 @@ function placeSeedNode(node, index, centerX, centerY, width, height) {
 }
 
 function animationLoop() {
-  if (state.page !== 'raw' || state.view !== 'graph') {
+  if (state.page !== 'data' || state.view !== 'graph') {
     requestAnimationFrame(animationLoop);
     return;
   }
@@ -1171,7 +1074,7 @@ function bindCanvasEvents() {
   canvas.addEventListener('wheel', onCanvasWheel, { passive: false });
 
   window.addEventListener('resize', () => {
-    if (state.page === 'raw' && state.view === 'graph') {
+    if (state.page === 'data' && state.view === 'graph') {
       applyLayout(false);
     }
   });
@@ -1296,9 +1199,9 @@ function showNodeTooltip(node, event) {
     <h3>${escapeHtml(getName(node))}</h3>
     <p>ID: ${escapeHtml(node.vid)}</p>
     <div class="chips">
-      <span class="chip">${escapeHtml(t('inDegree'))} ${node.degree.in}</span>
-      <span class="chip">${escapeHtml(t('outDegree'))} ${node.degree.out}</span>
-      <span class="chip">${escapeHtml(t('totalDegree'))} ${node.degree.total}</span>
+      <span class="chip">${DATA_TEXT.inDegree} ${node.degree.in}</span>
+      <span class="chip">${DATA_TEXT.outDegree} ${node.degree.out}</span>
+      <span class="chip">${DATA_TEXT.totalDegree} ${node.degree.total}</span>
     </div>
   `;
   moveTooltip(event);
@@ -1316,12 +1219,12 @@ function showEdgeTooltip(edge, event) {
     .join('');
 
   tooltip.innerHTML = `
-    <h3>${escapeHtml(formatText(t('relationTitle'), { source, target }))}</h3>
+    <h3>${escapeHtml(formatText(DATA_TEXT.relationTitle, { source, target }))}</h3>
     <p>${escapeHtml(getRelationText(edge))}</p>
     ${extraFields}
     <div class="chips">
       <span class="chip">${escapeHtml(edge.source_vid)}</span>
-      <span class="chip">${escapeHtml(t('relationLabel'))}</span>
+      <span class="chip">${DATA_TEXT.relationLabel}</span>
       <span class="chip">${escapeHtml(edge.target_vid)}</span>
     </div>
   `;
@@ -1360,49 +1263,32 @@ function screenToWorld(x, y) {
   };
 }
 
-function applyTranslations() {
-  document.documentElement.lang = state.lang === 'zh' ? 'zh-CN' : 'en';
-  app.dom.pageTitle.textContent = t(`pageTitle${state.page.charAt(0).toUpperCase() + state.page.slice(1)}`);
-
-  qsa('[data-i18n]').forEach((element) => {
-    element.textContent = t(element.dataset.i18n);
-  });
-}
-
-function t(key) {
-  return PAGE_TEXT[state.lang]?.[key] || PAGE_TEXT.en[key] || key;
-}
-
-function uiText(key, lang = state.lang) {
-  return UI_TEXT[lang]?.[key] || UI_TEXT.en[key] || key;
-}
-
-function getName(node, lang = state.lang) {
+function getName(node, lang = state.dataLanguage) {
   const props = node?.properties || {};
-  return props[`name_${lang}`] || props.name_en || node?.vid || uiText('unknown', lang);
+  return props[`name_${lang}`] || props.name_en || node?.vid || DATA_TEXT.unknown;
 }
 
-function getOtherName(node, lang = state.lang) {
+function getOtherName(node, lang = state.dataLanguage) {
   const next = lang === 'zh' ? 'en' : 'zh';
   return node?.properties?.[`name_${next}`] || node?.vid || '';
 }
 
-function edgeEndpoint(edge, side, lang = state.lang) {
+function edgeEndpoint(edge, side, lang = state.dataLanguage) {
   return edge?.properties?.[`${side}_name_${lang}`] || edge?.[`${side}_id`] || '';
 }
 
 function edgeKey(edge) {
-  return `${edge.source_vid}->${edge.target_vid}::${edge.id || edgeTitle(edge, 'en') || ''}`;
+  return `${edge.source_vid}->${edge.target_vid}::${edge.id || edgeTitle(edge) || ''}`;
 }
 
-function edgeTitle(edge, lang = state.lang) {
+function edgeTitle(edge, lang = state.dataLanguage) {
   const props = edge?.properties || {};
   return props[`content_${lang}`] || props[`title_${lang}`] || props.content_en || props.title_en || edge?.id || '';
 }
 
 function getRelationText(edge) {
   const props = edge?.properties || {};
-  return props[`content_${state.lang}`] || props[`title_${state.lang}`] || '';
+  return props[`content_${state.dataLanguage}`] || props[`title_${state.dataLanguage}`] || '';
 }
 
 function intersectSets(a, b) {
@@ -1475,25 +1361,23 @@ function showAuthMessage(message) {
 }
 
 async function loadDataset(name) {
-  const dataset = DATASETS[name];
-  if (!dataset) return;
+  const config = DATASOURCES.get(name);
+  if (!config) return;
 
   try {
-    const response = await fetch(dataset.apiUrl);
+    const response = await fetch(config.apiUrl);
     const data = await response.json();
     state.data = normalizeData(data);
-    state.dataset = name;
-    rebuildIndexes();
-    rebuildNodeSelects();
+    state.dataSource = name;
   } catch (error) {
-    console.error('Failed to load dataset:', error);
-    state.data = { nodes: [], edges: [] };
+    console.error('Failed to load data source:', error);
+    state.data = { nodes: [], edges: [], has_english: false, has_chinese: false };
   }
 }
 
 function normalizeData(data) {
   if (!Array.isArray(data.nodes) || !Array.isArray(data.edges)) {
-    throw new Error(uiText('invalidJson'));
+    throw new Error('JSON 需要包含 nodes 和 edges 数组');
   }
   data.nodes.forEach((node) => {
     node.properties = node.properties || {};
@@ -1546,7 +1430,7 @@ function rebuildIndexes() {
 
 function rebuildNodeSelects() {
   const nodes = [...(state.data.nodes || [])].sort((a, b) => {
-    const locale = state.lang === 'zh' ? 'zh-Hans-CN' : 'en';
+    const locale = state.dataLanguage === 'zh' ? 'zh-Hans-CN' : 'en';
     return getName(a).localeCompare(getName(b), locale);
   });
 
@@ -1558,18 +1442,11 @@ function rebuildNodeSelects() {
 function renderNodeSelect(select, selectedValue, nodes) {
   if (!select) return;
   const options = [
-    `<option value="">${escapeHtml(t('selectAll'))}</option>`,
+    `<option value="">${escapeHtml(DATA_TEXT.selectAll)}</option>`,
     ...nodes.map((node) => `<option value="${escapeHtml(node.vid)}">${escapeHtml(getName(node))} (${escapeHtml(node.vid)})</option>`)
   ];
   select.innerHTML = options.join('');
   select.value = selectedValue;
-}
-
-function bindDatasetSelect() {
-  app.dom.dataset?.addEventListener('change', async (event) => {
-    await loadDataset(event.target.value);
-    renderPage();
-  });
 }
 
 function bindFilters() {
@@ -1631,36 +1508,4 @@ function resetFocusFilter() {
 function resetPathFilter() {
   state.filters.pathSourceId = '';
   state.filters.pathTargetId = '';
-}
-
-function bindWorkflowButtons() {
-  const handleWorkflowClick = async (url, body) => {
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        console.warn('Workflow API:', data.message || 'unavailable');
-        return;
-      }
-      console.log('Workflow started:', data);
-    } catch (e) {
-      console.warn('Workflow API error:', e);
-    }
-  };
-
-  qs('[data-start-text-workflow]')?.addEventListener('click', () => handleWorkflowClick('/api/workflow/text/start'));
-  qs('[data-start-video-workflow]')?.addEventListener('click', () => {
-    const id = app.dom.videoIdInput?.value?.trim();
-    if (!id) return;
-    handleWorkflowClick('/api/workflow/video/start', { id });
-  });
-  qs('[data-download-video]')?.addEventListener('click', () => {
-    const id = app.dom.videoIdInput?.value?.trim();
-    if (!id) return;
-    handleWorkflowClick(`/api/workflow/video/download?id=${encodeURIComponent(id)}`);
-  });
 }
