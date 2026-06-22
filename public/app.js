@@ -19,7 +19,9 @@ const state = {
 };
 
 const DATASOURCES = new Map([
-  ['genshin', { nameZh: '原神', apiUrl: '/api/network/genshin' }]
+  ['genshin', { nameZh: '原神', apiUrl: '/api/network/genshin' }],
+  ['scp', { nameZh: 'SCP', apiUrl: '/api/network/scp' }],
+  ['backrooms', { nameZh: 'Backrooms', apiUrl: '/api/network/backrooms' }]
 ]);
 
 const DATA_TEXT = {
@@ -207,15 +209,7 @@ async function handleDataSourceChange(event) {
   state.dataLoaded = false;
   state.view = null;
 
-  // 禁用语言和展示类型下拉框
-  if (app.dom.dataLanguage) {
-    app.dom.dataLanguage.setAttribute('disabled', '');
-    app.dom.dataLanguage.innerHTML = '<option value="">请先选择数据源</option>';
-  }
-  if (app.dom.displayType) {
-    app.dom.displayType.setAttribute('disabled', '');
-    app.dom.displayType.value = '';
-  }
+  resetDataControls();
 
   if (!sourceKey) {
     renderPage();
@@ -230,13 +224,27 @@ async function handleDataSourceChange(event) {
     const data = await response.json();
     state.data = normalizeData(data);
     populateLanguageOptions();
-    // 启用语言下拉框
-    app.dom.dataLanguage?.removeAttribute('disabled');
+    syncLanguageControls();
     renderPage();
   } catch (error) {
     console.error('Failed to load data source:', error);
     state.data = { nodes: [], edges: [], has_english: false, has_chinese: false };
+    resetDataControls();
+    renderPage();
   }
+}
+
+function resetDataControls() {
+  if (app.dom.dataLanguage) {
+    app.dom.dataLanguage.setAttribute('disabled', '');
+    app.dom.dataLanguage.innerHTML = '<option value="">请先选择数据源</option>';
+  }
+  if (app.dom.displayType) {
+    app.dom.displayType.setAttribute('disabled', '');
+    app.dom.displayType.value = '';
+  }
+  app.dom.graphFilterSection?.classList.add('is-hidden');
+  app.dom.cardsFilterSection?.classList.add('is-hidden');
 }
 
 function populateLanguageOptions() {
@@ -259,38 +267,34 @@ function populateLanguageOptions() {
     select.appendChild(option);
   }
 
-  if (has_chinese) {
-    state.dataLanguage = 'zh';
-    select.value = 'zh';
-  } else if (has_english) {
-    state.dataLanguage = 'en';
-    select.value = 'en';
-  }
+  select.insertAdjacentHTML('afterbegin', '<option value="">请选择</option>');
+  select.value = '';
 }
 
 function handleLanguageChange(event) {
   state.dataLanguage = event.target.value;
-  // 启用展示类型下拉框
-  app.dom.displayType?.removeAttribute('disabled');
-  // 更新节点下拉框的显示名称
-  rebuildNodeSelects();
+  syncLanguageControls();
   renderPage();
+}
+
+function syncLanguageControls() {
+  if (app.dom.dataLanguage?.options.length > 1) {
+    app.dom.dataLanguage.removeAttribute('disabled');
+  }
+
+  if (state.dataLanguage) {
+    app.dom.displayType?.removeAttribute('disabled');
+  } else {
+    app.dom.displayType?.setAttribute('disabled', '');
+  }
+  rebuildNodeSelects();
 }
 
 function handleDisplayTypeChange(event) {
   state.displayType = event.target.value;
   state.view = state.displayType || null;
 
-  if (state.displayType === 'graph') {
-    app.dom.graphFilterSection?.classList.remove('is-hidden');
-    app.dom.cardsFilterSection?.classList.add('is-hidden');
-  } else if (state.displayType === 'cards') {
-    app.dom.graphFilterSection?.classList.add('is-hidden');
-    app.dom.cardsFilterSection?.classList.remove('is-hidden');
-  } else {
-    app.dom.graphFilterSection?.classList.add('is-hidden');
-    app.dom.cardsFilterSection?.classList.add('is-hidden');
-  }
+  syncDisplayFilterControls();
 
   if (state.displayType && state.data.nodes.length > 0) {
     state.dataLoaded = true;
@@ -298,6 +302,11 @@ function handleDisplayTypeChange(event) {
     rebuildNodeSelects();
   }
   renderPage();
+}
+
+function syncDisplayFilterControls() {
+  app.dom.graphFilterSection?.classList.toggle('is-hidden', state.displayType !== 'graph');
+  app.dom.cardsFilterSection?.classList.toggle('is-hidden', state.displayType !== 'cards');
 }
 
 function updateThemeButton() {
@@ -382,6 +391,8 @@ function renderPage() {
 
   if (state.page === 'data') {
     app.dom.pageTitle.textContent = '数据展示';
+    app.dom.configSection?.classList.remove('is-hidden');
+    syncDisplayFilterControls();
 
     if (state.dataLoaded && state.view) {
       app.dom.emptyPage?.classList.add('is-hidden');
