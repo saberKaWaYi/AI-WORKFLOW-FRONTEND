@@ -1,3 +1,5 @@
+import { decryptApiResponse } from './response-crypto.js';
+
 function readApiError(data, status) {
   if (typeof data?.message === 'string' && data.message) return data.message;
   if (typeof data?.detail === 'string' && data.detail) return data.detail;
@@ -13,5 +15,5 @@ export async function api(url, options = {}) {
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
   if (!response.ok) throw new Error(readApiError(data, response.status));
-  return data;
+  return decryptApiResponse(data);
 }

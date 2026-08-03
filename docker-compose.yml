@@ -6,4 +6,10 @@
       - "host.docker.internal:host-gateway"
     ports:
       - "3000:3000"
+    networks:
+      - ai-workflow-internal
     restart: unless-stopped
+
+networks:
+  ai-workflow-internal:
+    external: true
