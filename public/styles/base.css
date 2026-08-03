@@ -1,0 +1,158 @@
+:root {
+  color-scheme: light;
+  --bg: #f6f3ec;
+  --panel: rgba(255, 255, 255, 0.82);
+  --panel-strong: #ffffff;
+  --text: #25211b;
+  --muted: #706b61;
+  --line: rgba(61, 52, 39, 0.13);
+  --accent: #237a6f;
+  --accent-2: #c88a28;
+  --accent-data: #237a6f;
+  --accent-text: #2f6fb2;
+  --accent-video: #c88a28;
+  --accent-admin: #7b4ea6;
+  --danger: #b44848;
+  --shadow: 0 24px 70px rgba(63, 51, 35, 0.14);
+  --card: rgba(255, 255, 255, 0.72);
+}
+
+.theme-scope {
+  color-scheme: light;
+  --bg: #f6f3ec;
+  --panel: rgba(255, 255, 255, 0.82);
+  --panel-strong: #ffffff;
+  --text: #25211b;
+  --muted: #706b61;
+  --line: rgba(61, 52, 39, 0.13);
+  --accent: #237a6f;
+  --accent-2: #c88a28;
+  --accent-data: #237a6f;
+  --accent-text: #2f6fb2;
+  --accent-video: #c88a28;
+  --accent-admin: #7b4ea6;
+  --danger: #b44848;
+  --shadow: 0 24px 70px rgba(63, 51, 35, 0.14);
+  --card: rgba(255, 255, 255, 0.72);
+  color: var(--text);
+}
+
+.theme-scope.dark {
+  color-scheme: dark;
+  --bg: #10151a;
+  --panel: rgba(22, 29, 36, 0.86);
+  --panel-strong: #18212a;
+  --text: #f2efe8;
+  --muted: #a9b0b7;
+  --line: rgba(240, 231, 214, 0.13);
+  --accent: #69d5bf;
+  --accent-2: #e3b15a;
+  --accent-data: #69d5bf;
+  --accent-text: #7eb8ff;
+  --accent-video: #e3b15a;
+  --accent-admin: #c89bff;
+  --danger: #ff8b8b;
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+  --card: rgba(24, 33, 42, 0.76);
+}
+
+* { box-sizing: border-box; }
+
+html, body { min-height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg, #f6f3ec);
+  font-family: Inter, "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+}
+
+.theme-scope[data-theme-scope="data"],
+.theme-scope[data-theme-scope="text"],
+.theme-scope[data-theme-scope="video"] {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(35, 122, 111, 0.16), transparent 35rem),
+    linear-gradient(135deg, var(--bg), color-mix(in srgb, var(--bg), var(--accent-2) 8%));
+}
+
+button, input, select { font: inherit; }
+button { color: inherit; cursor: pointer; }
+
+.is-hidden { display: none !important; }
+
+.tab, .primary-btn, .ghost-btn, .icon-btn, .theme-btn, .theme-float-btn, .theme-icon-btn {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+
+.tab.is-active, .primary-btn {
+  border-color: color-mix(in srgb, var(--accent), var(--line) 25%);
+  background: color-mix(in srgb, var(--accent), var(--panel-strong) 82%);
+  color: #fff;
+}
+
+.primary-btn, .ghost-btn { min-height: 42px; padding: 8px 14px; }
+.ghost-btn { background: transparent; }
+
+.field { display: grid; gap: 7px; margin-bottom: 14px; }
+.field label { font-size: 13px; color: var(--muted); }
+.field input, .field select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--panel-strong);
+  color: var(--text);
+  outline: none;
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.chip {
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel-strong), var(--accent) 5%);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.empty {
+  padding: 42px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  text-align: center;
+  color: var(--muted);
+  background: var(--card);
+}
+
+.tooltip {
+  position: fixed;
+  max-width: 300px;
+  pointer-events: none;
+  z-index: 40;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-strong), transparent 7%);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+  opacity: 0;
+  transform: translate(12px, 12px);
+  transition: opacity 100ms ease;
+  color: var(--text);
+}
+
+.tooltip.visible { opacity: 1; }
+.tooltip h3 { margin: 0 0 6px; font-size: 15px; }
+.tooltip p { margin: 4px 0; color: var(--muted); font-size: 12px; }
+.tooltip img { width: 72px; height: 72px; object-fit: contain; float: right; margin-left: 10px; }
+
+.micro { color: var(--muted); font-size: 12px; }
+
+@media (max-width: 820px) {
+  .app-shell, .app-shell.sidebar-collapsed { grid-template-columns: 1fr; }
+  .sidebar { position: relative; height: auto; }
+}

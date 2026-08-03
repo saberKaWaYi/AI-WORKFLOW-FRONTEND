@@ -1,0 +1,233 @@
+import { DATA_TEXT } from '../core/state.js';
+import { cssEscape, escapeHtml } from '../core/utils.js';
+import { getName, getOtherName, edgeEndpoint, getRelationText } from '../systems/data/character-utils.js';
+
+let gridEl = null;
+let panelEl = null;
+let panelTitleEl = null;
+let panelContentEl = null;
+let onNodeSelect = null;
+let language = 'zh';
+let index = null;
+let panel = { hoveredId: null, pinnedId: null };
+let bound = false;
+
+export function initListView(grid, panelElements, onSelect) {
+  gridEl = grid;
+  panelEl = panelElements?.panel;
+  panelTitleEl = panelElements?.title;
+  panelContentEl = panelElements?.content;
+  onNodeSelect = onSelect;
+
+  if (bound) return;
+  bound = true;
+
+  gridEl?.addEventListener('click', onGridClick);
+  gridEl?.addEventListener('keydown', onGridKeyDown);
+  gridEl?.addEventListener('mouseover', onCardHover);
+  gridEl?.addEventListener('mouseout', onCardLeave);
+  panelEl?.addEventListener('click', onPanelClick);
+  panelEl?.addEventListener('mouseleave', onPanelLeave);
+  document.addEventListener('click', onDocumentClick);
+  window.addEventListener('scroll', syncFloatingPanel, { passive: true });
+}
+
+export function closeListPanel() {
+  panel.hoveredId = null;
+  panel.pinnedId = null;
+  updatePanelVisibility(false);
+}
+
+function onGridClick(event) {
+  const card = event.target.closest('[data-character-id]');
+  if (!card || !onNodeSelect) return;
+  onNodeSelect(card.dataset.characterId);
+}
+
+function onGridKeyDown(event) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const card = event.target.closest('[data-character-id]');
+  if (!card || !onNodeSelect) return;
+  event.preventDefault();
+  onNodeSelect(card.dataset.characterId);
+}
+
+function onCardHover(event) {
+  if (panel.pinnedId) return;
+  const card = event.target.closest('[data-character-id]');
+  if (!card) return;
+  showFloatingPanel(card.dataset.characterId);
+}
+
+function onCardLeave(event) {
+  if (panel.pinnedId) return;
+  const card = event.target.closest('[data-character-id]');
+  if (!card) return;
+  if (card.contains(event.relatedTarget)) return;
+  if (event.relatedTarget?.closest?.('[data-floating-panel]')) return;
+  hideFloatingPanel();
+}
+
+function onPanelClick(event) {
+  const jumpButton = event.target.closest('[data-related-jump]');
+  if (jumpButton) {
+    openCharacterPanel(jumpButton.dataset.targetId);
+    return;
+  }
+  if (panel.hoveredId) {
+    panel.pinnedId = panel.hoveredId;
+    syncFloatingPanel();
+  }
+}
+
+function onPanelLeave() {
+  if (panel.pinnedId) return;
+  hideFloatingPanel();
+}
+
+function onDocumentClick(event) {
+  if (!panel.pinnedId) return;
+  if (event.target.closest('[data-floating-panel]')) return;
+  closeListPanel();
+}
+
+function showFloatingPanel(characterId) {
+  panel.hoveredId = characterId;
+  syncFloatingPanel();
+}
+
+function hideFloatingPanel() {
+  panel.hoveredId = null;
+  updatePanelVisibility(false);
+}
+
+function openCharacterPanel(characterId) {
+  panel.hoveredId = characterId;
+  panel.pinnedId = characterId;
+  document.querySelector(`[data-character-id="${cssEscape(characterId)}"]`)?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'center'
+  });
+  requestAnimationFrame(syncFloatingPanel);
+}
+
+function syncFloatingPanel() {
+  const activeId = panel.pinnedId || panel.hoveredId;
+  if (!activeId) {
+    updatePanelVisibility(false);
+    return;
+  }
+
+  const anchor = document.querySelector(`[data-character-id="${cssEscape(activeId)}"]`);
+  if (!anchor) {
+    updatePanelVisibility(false);
+    return;
+  }
+
+  if (panelTitleEl) panelTitleEl.textContent = DATA_TEXT.relatedTitle;
+  if (panelContentEl) panelContentEl.innerHTML = renderRelatedList(activeId);
+  updatePanelVisibility(true);
+  panelEl?.classList.toggle('is-pinned', panel.pinnedId === activeId);
+  positionFloatingPanel(anchor, panelEl);
+}
+
+function renderRelatedList(characterId) {
+  const relatedList = index?.relatedById?.get(characterId) || [];
+  if (!relatedList.length) {
+    return `<div class="related-empty">${escapeHtml(DATA_TEXT.noRelated)}</div>`;
+  }
+
+  return `
+    <div class="related-list">
+      ${relatedList.map(renderRelatedItem).join('')}
+    </div>
+  `;
+}
+
+function renderRelatedItem({ node, edge, direction }) {
+  const label = direction === 'out' ? edgeEndpoint(edge, 'target', language) : edgeEndpoint(edge, 'source', language);
+  const relation = getRelationText(edge, language);
+  const fallback = `ID: ${node.vid}`;
+  return `
+    <button class="related-item" type="button" data-related-jump data-target-id="${escapeHtml(node.vid)}">
+      <strong>${escapeHtml(label || getName(node, language))}</strong>
+      <span>${escapeHtml(relation || fallback)}</span>
+    </button>
+  `;
+}
+
+function positionFloatingPanel(anchor, panelNode) {
+  if (!panelNode) return;
+  const anchorRect = anchor.getBoundingClientRect();
+  const panelRect = panelNode.getBoundingClientRect();
+  const gap = 12;
+  const margin = 16;
+  let left = anchorRect.right + gap;
+  let top = anchorRect.top;
+
+  if (left + panelRect.width > window.innerWidth - margin) {
+    left = anchorRect.left - panelRect.width - gap;
+  }
+  if (left < margin) {
+    left = Math.max(margin, window.innerWidth - panelRect.width - margin);
+  }
+  if (top + panelRect.height > window.innerHeight - margin) {
+    top = window.innerHeight - panelRect.height - margin;
+  }
+  if (top < margin) {
+    top = margin;
+  }
+
+  panelNode.style.left = `${left}px`;
+  panelNode.style.top = `${top}px`;
+}
+
+function updatePanelVisibility(visible) {
+  panelEl?.classList.toggle('is-open', visible);
+  if (!visible) {
+    panelEl?.classList.remove('is-pinned');
+  }
+}
+
+export function renderList(nodes, options) {
+  if (!gridEl) return;
+
+  language = options.language;
+  index = options.index;
+
+  if (!nodes.length) {
+    closeListPanel();
+    gridEl.innerHTML = `<div class="empty">${escapeHtml(DATA_TEXT.empty)}</div>`;
+    return;
+  }
+
+  gridEl.innerHTML = nodes.map((node) => renderCard(node, language, index)).join('');
+
+  if (panel.pinnedId || panel.hoveredId) {
+    syncFloatingPanel();
+  }
+}
+
+function renderCard(node, lang, dataIndex) {
+  const image = node.properties.photo || '';
+  const degree = dataIndex.degreeById.get(node.vid)?.total || 0;
+  return `
+    <article class="character-card" data-character-id="${escapeHtml(node.vid)}" role="button" tabindex="0">
+      <div class="portrait">${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(getName(node, lang))}" loading="lazy">` : ''}</div>
+      <div class="card-body">
+        <h3>${escapeHtml(getName(node, lang))}</h3>
+        <p>${escapeHtml(getOtherName(node, lang))}</p>
+        <div class="chips">
+          <span class="chip">ID: ${escapeHtml(node.vid)}</span>
+          <span class="chip">连接 ${degree}</span>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+export function matchesQuery(node, query) {
+  if (!query) return true;
+  const haystack = [node.vid, node.properties.name_zh, node.properties.name_en].join(' ').toLowerCase();
+  return haystack.includes(query);
+}

@@ -3,32 +3,71 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>人工智能工作链前端</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <title>人工智能工作链平台</title>
+    <link rel="stylesheet" href="./styles/base.css" />
+    <link rel="stylesheet" href="./styles/auth.css" />
+    <link rel="stylesheet" href="./styles/data.css" />
+    <link rel="stylesheet" href="./styles/detail.css" />
+    <link rel="stylesheet" href="./styles/admin.css" />
   </head>
   <body>
-    <div class="auth-screen" data-auth-screen>
-      <div class="auth-bg-text" data-auth-bg-text></div>
-      <main class="auth-panel">
-        <section class="login-card">
+    <div class="auth-flow theme-scope" data-theme-scope="auth">
+      <button class="theme-float-btn" type="button" data-theme-toggle title="切换主题">
+        <span data-theme-icon>☀</span>
+      </button>
+
+    <div class="portal-screen" data-portal-screen>
+      <div class="portal-inner">
+        <header class="portal-header">
+          <h1>人工智能工作链平台</h1>
+          <p>请选择要进入的系统</p>
+        </header>
+        <div class="portal-grid">
+          <button class="portal-card portal-card-data" type="button" data-system-card="data">
+            <span class="portal-icon">▦</span>
+            <strong>数据展示</strong>
+            <span>角色关系网络可视化</span>
+            <em>进入</em>
+          </button>
+          <button class="portal-card portal-card-text" type="button" data-system-card="text">
+            <span class="portal-icon">⎘</span>
+            <strong>文本 AI 任务链</strong>
+            <span>文本生成与编排工作流</span>
+            <em>进入</em>
+          </button>
+          <button class="portal-card portal-card-video" type="button" data-system-card="video">
+            <span class="portal-icon">▶</span>
+            <strong>视频 AI 任务链</strong>
+            <span>视频生成与剪辑工作流</span>
+            <em>进入</em>
+          </button>
+          <button class="portal-card portal-card-admin" type="button" data-system-card="admin">
+            <span class="portal-icon">⚙</span>
+            <strong>系统管理</strong>
+            <span>账号与权限管理</span>
+            <em>进入</em>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="auth-panel-screen is-hidden" data-auth-panel-screen>
+      <div class="auth-panel-wrap">
+        <button class="auth-back" type="button" data-auth-back>← 返回选择系统</button>
+        <main class="login-card auth-system-card">
           <div class="auth-header">
-            <span class="micro">人工智能工作链前端</span>
+            <div>
+              <strong data-auth-system-title>数据展示</strong>
+              <p data-auth-system-subtitle>角色关系网络可视化</p>
+            </div>
           </div>
-          <div class="tabs" role="tablist">
+          <div class="tabs" role="tablist" data-auth-tabs>
             <button class="tab is-active" type="button" data-auth-tab="login">登录</button>
             <button class="tab" type="button" data-auth-tab="register">注册</button>
           </div>
           <form class="auth-form" data-auth-form="login">
             <label>账号或邮箱<input name="login" autocomplete="username" required /></label>
             <label>密码<input name="password" type="password" autocomplete="current-password" required /></label>
-            <div class="field">
-              <label>进入系统</label>
-              <select id="entrySystem" data-entry-system>
-                <option value="data">数据展示</option>
-                <option value="text">文本AI任务链</option>
-                <option value="video">视频AI任务链</option>
-              </select>
-            </div>
             <button class="primary-btn" type="submit">登录</button>
           </form>
           <form class="auth-form is-hidden" data-auth-form="register">
@@ -36,173 +75,233 @@
             <label>邮箱<input name="email" type="email" autocomplete="email" /></label>
             <label>显示名称<input name="displayName" autocomplete="nickname" /></label>
             <label>密码<input name="password" type="password" autocomplete="new-password" required /></label>
-            <div class="field">
-              <label>进入系统</label>
-              <select id="entrySystemReg" data-entry-system-reg>
-                <option value="data">数据展示</option>
-                <option value="text">文本AI任务链</option>
-                <option value="video">视频AI任务链</option>
-              </select>
-            </div>
             <button class="primary-btn" type="submit">注册并进入</button>
           </form>
           <button class="ghost-btn" type="button" data-guest>游客登录</button>
           <p class="form-message" data-auth-message></p>
-        </section>
-      </main>
+        </main>
+      </div>
+    </div>
     </div>
 
-    <div class="app-shell is-hidden" data-app-shell>
-      <aside class="sidebar">
-        <div class="sidebar-top">
-          <div class="brand hide-when-collapsed">
-            <strong>人工智能工作链前端</strong>
-            <span class="micro">数据展示平台</span>
+    <div class="app-root is-hidden" data-app-root>
+      <div class="app-shell theme-scope is-hidden" data-app-shell data-theme-scope="data" data-shell="data">
+        <aside class="sidebar">
+          <div class="sidebar-top">
+            <div class="brand hide-when-collapsed">
+              <strong>数据展示</strong>
+              <span class="micro">角色关系网络</span>
+            </div>
+            <button class="icon-btn" type="button" data-sidebar-toggle title="收放侧边栏">☰</button>
           </div>
-          <button class="icon-btn" type="button" data-sidebar-toggle title="收放侧边栏">☰</button>
-        </div>
 
-        <div class="panel-section hide-when-collapsed" data-theme-section>
-          <button class="theme-icon-btn" type="button" data-theme-toggle title="切换主题">
-            <span data-theme-icon>☀</span>
-          </button>
-        </div>
+          <div class="panel-section hide-when-collapsed" data-theme-section>
+            <button class="theme-icon-btn" type="button" data-theme-toggle title="切换主题">
+              <span data-theme-icon>☀</span>
+            </button>
+          </div>
 
-        <div class="panel-section hide-when-collapsed" data-config-section>
-          <h2>数据源配置</h2>
-          <div class="config-box">
+          <div class="panel-section hide-when-collapsed" data-config-section>
+            <h2>展示配置</h2>
+            <div class="config-box">
+              <div class="field">
+                <label for="dataSource">数据源</label>
+                <select id="dataSource" data-data-source>
+                  <option value="">请选择</option>
+                </select>
+              </div>
+              <div class="field detail-language-field">
+                <label for="dataLanguage">语言</label>
+                <select id="dataLanguage" data-data-language disabled>
+                  <option value="">请先选择数据源</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="displayType">展示类型</label>
+                <select id="displayType" data-display-type disabled>
+                  <option value="">请选择</option>
+                  <option value="cards">列表展示</option>
+                  <option value="graph">拓扑展示</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel-section hide-when-collapsed is-hidden" data-graph-filter-section>
+            <h2>筛选器</h2>
             <div class="field">
-              <label for="dataSource">数据源</label>
-              <select id="dataSource" data-data-source>
-                <option value="">请选择</option>
+              <label for="sizeMode">节点大小</label>
+              <select id="sizeMode" data-size-mode>
+                <option value="uniform">统一大小</option>
+                <option value="degree">按度大小</option>
               </select>
             </div>
-            <div class="field" data-language-field>
-              <label for="dataLanguage">语言</label>
-              <select id="dataLanguage" data-data-language disabled>
-                <option value="">请先选择数据源</option>
+            <div class="field">
+              <label for="layout">布局方式</label>
+              <select id="layout" data-layout>
+                <option value="radial">辐射布局</option>
+                <option value="force">力导向</option>
+                <option value="circle">环形布局</option>
+                <option value="columns">分列布局</option>
               </select>
             </div>
-            <div class="field" data-display-type-field>
-              <label for="displayType">展示类型</label>
-              <select id="displayType" data-display-type disabled>
-                <option value="">请选择</option>
-                <option value="cards">节点详情</option>
-                <option value="graph">网络拓扑</option>
-              </select>
+            <div class="filter-group" data-focus-group>
+              <div class="filter-group-title">辐射筛选</div>
+              <div class="field">
+                <label for="focusNode">中心节点</label>
+                <select id="focusNode" data-focus-node></select>
+              </div>
+              <div class="field">
+                <label for="focusDepth">辐射层数</label>
+                <select id="focusDepth" data-focus-depth>
+                  <option value="1">1 层</option>
+                  <option value="2">2 层</option>
+                  <option value="3">3 层</option>
+                  <option value="4">4 层</option>
+                  <option value="5">5 层</option>
+                </select>
+              </div>
+            </div>
+            <div class="filter-group" data-path-group>
+              <div class="filter-group-title">最短路径</div>
+              <div class="field">
+                <label for="pathSource">起点</label>
+                <select id="pathSource" data-path-source></select>
+              </div>
+              <div class="field">
+                <label for="pathTarget">终点</label>
+                <select id="pathTarget" data-path-target></select>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="panel-section hide-when-collapsed is-hidden" data-graph-filter-section>
-          <h2>筛选器</h2>
-
-          <div class="field">
-            <label for="sizeMode">节点大小</label>
-            <select id="sizeMode" data-size-mode>
-              <option value="uniform">统一大小</option>
-              <option value="degree">按度大小</option>
-            </select>
-          </div>
-
-          <div class="field">
-            <label for="layout">布局方式</label>
-            <select id="layout" data-layout>
-              <option value="radial">辐射布局</option>
-              <option value="force">力导向</option>
-              <option value="circle">环形布局</option>
-              <option value="columns">分列布局</option>
-            </select>
-          </div>
-
-          <div class="filter-group" data-focus-group>
-            <div class="filter-group-title">辐射筛选</div>
+          <div class="panel-section hide-when-collapsed is-hidden" data-cards-filter-section>
+            <h2>筛选器</h2>
             <div class="field">
-              <label for="focusNode">中心节点</label>
-              <select id="focusNode" data-focus-node></select>
-            </div>
-            <div class="field">
-              <label for="focusDepth">辐射层数</label>
-              <select id="focusDepth" data-focus-depth>
-                <option value="1">1 层</option>
-                <option value="2">2 层</option>
-                <option value="3">3 层</option>
-                <option value="4">4 层</option>
-                <option value="5">5 层</option>
-              </select>
+              <label for="search">搜索</label>
+              <input id="search" data-search type="text" placeholder="中文、英文或 ID" />
             </div>
           </div>
 
-          <div class="filter-group" data-path-group>
-            <div class="filter-group-title">最短路径</div>
-            <div class="field">
-              <label for="pathSource">起点</label>
-              <select id="pathSource" data-path-source></select>
+          <div class="panel-section hide-when-collapsed">
+            <button class="theme-btn" type="button" data-logout>退出登录</button>
+          </div>
+        </aside>
+
+        <main class="main">
+          <header class="page-header" data-main-header>
+            <div class="page-title">
+              <h1>数据展示</h1>
+              <p data-status></p>
             </div>
-            <div class="field">
-              <label for="pathTarget">终点</label>
-              <select id="pathTarget" data-path-target></select>
+            <div class="stats">
+              <div class="stat"><b data-total>0</b><span>节点</span></div>
+              <div class="stat"><b data-visible>0</b><span>显示</span></div>
+              <div class="stat"><b data-edges>0</b><span>关系</span></div>
+            </div>
+          </header>
+
+          <section id="characterGrid" class="grid is-hidden" data-view="cards"></section>
+
+          <div class="floating-related-panel" data-floating-panel>
+            <h4 data-floating-title>相关角色</h4>
+            <div data-floating-content></div>
+          </div>
+
+          <section class="graph-wrap is-hidden" data-view="graph">
+            <canvas id="graphCanvas"></canvas>
+          </section>
+
+          <section class="detail-view is-hidden" data-detail-view></section>
+
+          <div class="empty-page" data-empty-page>
+            <p class="empty-hint">请从左侧选择数据源并配置展示方式</p>
+          </div>
+
+          <div class="tooltip" id="tooltip"></div>
+        </main>
+      </div>
+
+      <div class="app-shell theme-scope shell-text is-hidden" data-app-shell data-theme-scope="text" data-shell="text">
+        <aside class="sidebar sidebar-text">
+          <div class="sidebar-top">
+            <div class="brand">
+              <strong data-text-title>文本 AI 任务链</strong>
+              <span class="micro" data-text-subtitle>文本生成与编排工作流</span>
             </div>
           </div>
-        </div>
-
-        <div class="panel-section hide-when-collapsed is-hidden" data-cards-filter-section>
-          <h2>筛选器</h2>
-          <div class="field">
-            <label for="search">搜索</label>
-            <input id="search" data-search type="text" placeholder="中文、英文或 ID" />
+          <div class="panel-section">
+            <button class="theme-icon-btn" type="button" data-theme-toggle title="切换主题">
+              <span data-theme-icon>☀</span>
+            </button>
           </div>
-        </div>
-
-        <div class="panel-section hide-when-collapsed">
-          <button class="theme-btn" type="button" data-logout>退出登录</button>
-        </div>
-      </aside>
-
-      <main class="main">
-        <header class="page-header" data-main-header>
-          <div class="page-title">
-            <h1 data-page-title>数据展示</h1>
-            <p data-status></p>
+          <div class="panel-section sidebar-greeting">
+            <p data-text-greeting></p>
           </div>
-          <div class="stats" data-stats-section>
-            <div class="stat"><b data-total>0</b><span>节点</span></div>
-            <div class="stat"><b data-visible>0</b><span>显示</span></div>
-            <div class="stat"><b data-edges>0</b><span>关系</span></div>
+          <div class="panel-section">
+            <button class="theme-btn" type="button" data-logout>退出登录</button>
           </div>
-        </header>
-
-        <section id="characterGrid" class="grid is-hidden" data-view="cards"></section>
-
-        <section class="graph-wrap is-hidden" data-view="graph">
-          <canvas id="graphCanvas"></canvas>
-        </section>
-
-        <div class="empty-page" data-empty-page>
-          <p class="empty-hint">请从左侧选择数据源并配置展示方式</p>
-        </div>
-
-        <div class="floating-related-panel" data-floating-panel>
-          <h4 data-floating-title>相关角色</h4>
-          <div data-floating-content></div>
-        </div>
-
-        <section class="workflow-section is-hidden" data-view="text">
-          <div class="empty-page">
+        </aside>
+        <main class="main">
+          <div class="dev-page" data-text-main>
             <p class="dev-notice">还在开发中</p>
+            <p class="dev-desc">文本 AI 任务链功能即将上线</p>
           </div>
-        </section>
+        </main>
+      </div>
 
-        <section class="workflow-section is-hidden" data-view="video">
-          <div class="empty-page">
-            <p class="dev-notice">还在开发中</p>
+      <div class="app-shell theme-scope shell-video is-hidden" data-app-shell data-theme-scope="video" data-shell="video">
+        <aside class="sidebar sidebar-video">
+          <div class="sidebar-top">
+            <div class="brand">
+              <strong data-video-title>视频 AI 任务链</strong>
+              <span class="micro" data-video-subtitle>视频生成与剪辑工作流</span>
+            </div>
           </div>
-        </section>
-      </main>
+          <div class="panel-section">
+            <button class="theme-icon-btn" type="button" data-theme-toggle title="切换主题">
+              <span data-theme-icon>☀</span>
+            </button>
+          </div>
+          <div class="panel-section sidebar-greeting">
+            <p data-video-greeting></p>
+          </div>
+          <div class="panel-section">
+            <button class="theme-btn" type="button" data-logout>退出登录</button>
+          </div>
+        </aside>
+        <main class="main">
+          <div class="dev-page" data-video-main>
+            <p class="dev-notice">还在开发中</p>
+            <p class="dev-desc">视频 AI 任务链功能即将上线</p>
+          </div>
+        </main>
+      </div>
+
+      <div class="app-shell theme-scope shell-admin is-hidden" data-app-shell data-theme-scope="admin" data-shell="admin">
+        <aside class="sidebar">
+          <div class="sidebar-top">
+            <div class="brand">
+              <strong data-admin-title>系统管理</strong>
+              <span class="micro" data-admin-subtitle>账号与权限管理</span>
+            </div>
+          </div>
+          <div class="panel-section">
+            <button class="theme-icon-btn" type="button" data-theme-toggle title="切换主题">
+              <span data-theme-icon>☀</span>
+            </button>
+          </div>
+          <div class="panel-section sidebar-greeting">
+            <p data-admin-greeting></p>
+          </div>
+          <div class="panel-section">
+            <button class="theme-btn" type="button" data-logout>退出登录</button>
+          </div>
+        </aside>
+        <main class="main" data-admin-main></main>
+      </div>
     </div>
 
-    <div class="tooltip" id="tooltip"></div>
-
-    <script src="./app.js"></script>
+    <script type="module" src="./js/main.js"></script>
   </body>
 </html>
