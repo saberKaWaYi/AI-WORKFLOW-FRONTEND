@@ -306,7 +306,10 @@
 
 .detail-related-portrait img { width: 100%; height: 100%; object-fit: contain; }
 .detail-related-card strong { display: block; font-size: 14px; }
-.detail-related-card span { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+.detail-related-relations { display: grid; gap: 8px; margin-top: 4px; }
+.detail-related-relation { display: grid; gap: 3px; color: var(--muted); font-size: 12px; }
+.detail-related-relation + .detail-related-relation { padding-top: 8px; border-top: 1px solid var(--line); }
+.detail-related-relation small { color: var(--accent); font-size: 11px; }
 
 .detail-skeleton, .detail-error, .detail-muted {
   padding: 40px;

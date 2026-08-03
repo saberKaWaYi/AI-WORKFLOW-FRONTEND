@@ -201,6 +201,10 @@
 }
 
 .related-item strong { font-size: 14px; }
+.related-relations { display: grid; gap: 8px; }
+.related-relation { display: grid; gap: 3px; }
+.related-relation + .related-relation { padding-top: 8px; border-top: 1px solid var(--line); }
+.related-relation small { color: var(--accent); font-size: 11px; }
 .related-item span,
 .related-empty { color: var(--muted); font-size: 12px; }
 

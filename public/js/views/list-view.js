@@ -1,6 +1,7 @@
 import { DATA_TEXT } from '../core/state.js';
 import { cssEscape, escapeHtml } from '../core/utils.js';
 import { getName, getOtherName, edgeEndpoint, getRelationText } from '../systems/data/character-utils.js';
+import { getRelatedNodes } from '../systems/data/network-index.js';
 
 let gridEl = null;
 let panelEl = null;
@@ -132,7 +133,7 @@ function syncFloatingPanel() {
 }
 
 function renderRelatedList(characterId) {
-  const relatedList = index?.relatedById?.get(characterId) || [];
+  const relatedList = getRelatedNodes(index || { relatedById: new Map() }, characterId);
   if (!relatedList.length) {
     return `<div class="related-empty">${escapeHtml(DATA_TEXT.noRelated)}</div>`;
   }
@@ -144,15 +145,26 @@ function renderRelatedList(characterId) {
   `;
 }
 
-function renderRelatedItem({ node, edge, direction }) {
-  const label = direction === 'out' ? edgeEndpoint(edge, 'target', language) : edgeEndpoint(edge, 'source', language);
-  const relation = getRelationText(edge, language);
+function renderRelatedItem({ node, relations }) {
   const fallback = `ID: ${node.vid}`;
   return `
     <button class="related-item" type="button" data-related-jump data-target-id="${escapeHtml(node.vid)}">
-      <strong>${escapeHtml(label || getName(node, language))}</strong>
-      <span>${escapeHtml(relation || fallback)}</span>
+      <strong>${escapeHtml(getName(node, language))}</strong>
+      <span class="related-relations">
+        ${relations.map(({ edge }) => renderRelation(edge, fallback)).join('')}
+      </span>
     </button>
+  `;
+}
+
+function renderRelation(edge, fallback) {
+  const source = edgeEndpoint(edge, 'source', language);
+  const target = edgeEndpoint(edge, 'target', language);
+  return `
+    <span class="related-relation">
+      <small>${escapeHtml(source)} → ${escapeHtml(target)}</small>
+      ${escapeHtml(getRelationText(edge, language) || fallback)}
+    </span>
   `;
 }
 

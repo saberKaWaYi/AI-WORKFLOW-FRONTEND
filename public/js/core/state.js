@@ -57,12 +57,16 @@ export function saveDataState() {
 export function restoreDataState() {
   const raw = sessionStorage.getItem(STORAGE_KEY);
   if (!raw) return;
-  const saved = JSON.parse(raw);
-  Object.assign(state.filters, saved.filters || {});
-  if (saved.dataSource) state.dataSource = saved.dataSource;
-  if (saved.dataLanguage) state.dataLanguage = saved.dataLanguage;
-  if (saved.displayType) {
-    state.displayType = saved.displayType;
-    state.view = saved.view || saved.displayType;
+  try {
+    const saved = JSON.parse(raw);
+    Object.assign(state.filters, saved.filters || {});
+    if (saved.dataSource) state.dataSource = saved.dataSource;
+    if (saved.dataLanguage) state.dataLanguage = saved.dataLanguage;
+    if (saved.displayType) {
+      state.displayType = saved.displayType;
+      state.view = saved.view || saved.displayType;
+    }
+  } catch {
+    sessionStorage.removeItem(STORAGE_KEY);
   }
 }

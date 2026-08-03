@@ -325,22 +325,34 @@ function renderRelated(related, lang) {
     <section class="detail-section">
       <h2>${escapeHtml(DATA_TEXT.relatedTitle)}</h2>
       <div class="detail-related-grid">
-        ${related.map(({ node, edge, direction }) => {
-          const label = direction === 'out' ? edgeEndpoint(edge, 'target', lang) : edgeEndpoint(edge, 'source', lang);
-          const relation = getRelationText(edge, lang);
+        ${related.map(({ node, relations }) => {
+          const label = getName(node, lang);
           const image = node.properties.photo || '';
           return `
-            <button class="detail-related-card" type="button" data-related-id="${escapeHtml(node.vid)}" aria-label="${escapeHtml(label || getName(node, lang))}">
+            <button class="detail-related-card" type="button" data-related-id="${escapeHtml(node.vid)}" aria-label="${escapeHtml(label)}">
               <div class="detail-related-portrait">${image ? `<img src="${escapeHtml(image)}" alt="">` : ''}</div>
               <div>
-                <strong>${escapeHtml(label || getName(node, lang))}</strong>
-                <span>${escapeHtml(relation || node.vid)}</span>
+                <strong>${escapeHtml(label)}</strong>
+                <div class="detail-related-relations">
+                  ${relations.map(({ edge }) => renderRelatedRelation(edge, lang, node.vid)).join('')}
+                </div>
               </div>
             </button>
           `;
         }).join('')}
       </div>
     </section>
+  `;
+}
+
+function renderRelatedRelation(edge, lang, fallback) {
+  const source = edgeEndpoint(edge, 'source', lang);
+  const target = edgeEndpoint(edge, 'target', lang);
+  return `
+    <span class="detail-related-relation">
+      <small>${escapeHtml(source)} → ${escapeHtml(target)}</small>
+      ${escapeHtml(getRelationText(edge, lang) || fallback)}
+    </span>
   `;
 }
 

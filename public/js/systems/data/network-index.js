@@ -50,8 +50,7 @@ export function rebuildIndexes(data, index) {
     const sourceNode = index.nodeById.get(edge.source_vid);
     const targetNode = index.nodeById.get(edge.target_vid);
     if (sourceNode && targetNode) {
-      index.relatedById.get(edge.source_vid)?.push({ node: targetNode, edge, direction: 'out' });
-      index.relatedById.get(edge.target_vid)?.push({ node: sourceNode, edge, direction: 'in' });
+      index.relatedById.get(edge.source_vid)?.push({ node: targetNode, edge });
     }
   });
 }
@@ -66,5 +65,32 @@ function edgeTitle(edge, lang = 'en') {
 }
 
 export function getRelatedNodes(index, characterId) {
-  return index.relatedById.get(characterId) || [];
+  const groups = new Map();
+
+  for (const item of index.relatedById.get(characterId) || []) {
+    const nodeId = item.node.vid;
+    let group = groups.get(nodeId);
+    if (!group) {
+      group = { node: item.node, relations: [], relationKeys: new Set() };
+      groups.set(nodeId, group);
+    }
+
+    const key = relatedEdgeKey(item);
+    if (!group.relationKeys.has(key)) {
+      group.relationKeys.add(key);
+      group.relations.push({ edge: item.edge });
+    }
+  }
+
+  return [...groups.values()].map(({ node, relations }) => ({ node, relations }));
+}
+
+function relatedEdgeKey({ edge }) {
+  const props = edge.properties || {};
+  return [
+    edge.source_vid,
+    edge.target_vid,
+    props.content_zh || props.title_zh || '',
+    props.content_en || props.title_en || ''
+  ].join('::');
 }

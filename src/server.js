@@ -12,7 +12,8 @@ import { ensureUltimateUser } from "./auth/seed.js";
 dotenv.config();
 
 const port = Number(process.env.APP_PORT || 3000);
-const collectorApi = process.env.COLLECTOR_API_URL || "http://localhost:8000/api";
+const collectorApi = (process.env.COLLECTOR_API_URL || "http://localhost:8000/api").replace(/\/+$/, "");
+const collectorTimeoutMs = Math.max(1000, Number(process.env.COLLECTOR_TIMEOUT_MS) || 15000);
 
 if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 16) {
   throw new Error("SESSION_SECRET must be at least 16 characters");
@@ -38,16 +39,25 @@ app.use(express.static(path.join(path.dirname(fileURLToPath(import.meta.url)), "
 }));
 
 async function proxy(url, res) {
-  const response = await fetch(url, { headers: { Accept: "application/json" } });
-  const body = await response.text();
-  res.status(response.status);
-  res.setHeader("Content-Type", response.headers.get("content-type") || "application/json; charset=utf-8");
-  res.send(body);
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(collectorTimeoutMs)
+    });
+    const body = Buffer.from(await response.arrayBuffer());
+    res.status(response.status);
+    res.setHeader("Content-Type", response.headers.get("content-type") || "application/json; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    return res.send(body);
+  } catch (error) {
+    console.error("collector proxy failed", error);
+    return res.status(502).json({ message: "Data service is temporarily unavailable" });
+  }
 }
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.get("/api/businesses", (_req, res) => proxy(`${collectorApi}/businesses`, res));
-app.get("/api/network/:business", (req, res) => proxy(`${collectorApi}/network/${req.params.business}`, res));
+app.get("/api/network/:business", (req, res) => proxy(`${collectorApi}/network/${encodeURIComponent(req.params.business)}`, res));
 app.get("/api/nodes", (req, res) => {
   const { business_name, name } = req.query;
   if (!business_name || !name) return res.status(400).json({ message: "business_name and name are required" });
