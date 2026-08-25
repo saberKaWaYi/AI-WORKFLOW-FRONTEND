@@ -1,4 +1,5 @@
 import { DATA_TEXT, state } from '../../core/state.js';
+import { api } from '../../core/api.js';
 import { formatText } from '../../core/utils.js';
 import { navigateToDataMain, navigateToDetail } from '../../core/router.js';
 import { compareNodes } from './character-utils.js';
@@ -9,9 +10,11 @@ import { initDetailView, showDetail, hideDetail } from '../../views/detail-view.
 
 let dom = {};
 let currentRoute = { system: 'data', page: 'main' };
+let semanticSearchBound = false;
 
 export function initDataApp(elements) {
   dom = elements;
+  bindSemanticSearch();
 
   initListView(
     dom.grid,
@@ -53,6 +56,11 @@ export function renderDataRoute(route) {
 }
 
 function renderDataPage(options = {}) {
+  if (state.semanticSearch.businessName && state.semanticSearch.businessName !== state.dataSource) {
+    resetSemanticSearch();
+  }
+  syncSemanticSearchUi();
+
   if (currentRoute.page === 'detail') {
     renderDetailRoute();
     return;
@@ -89,12 +97,109 @@ function renderDataPage(options = {}) {
 
 function renderCardsMain() {
   const index = getDataIndex();
-  const nodes = [...(state.data.nodes || [])]
-    .filter((node) => matchesQuery(node, state.filters.query))
-    .sort((a, b) => compareNodes(a, b, state.dataLanguage));
+  const semanticScores = new Map();
+  let nodes;
+
+  if (state.semanticSearch.active) {
+    const nodesByLowerId = new Map(
+      [...index.nodeById.entries()].map(([nodeId, node]) => [nodeId.toLowerCase(), node])
+    );
+    nodes = state.semanticSearch.results
+      .map((result) => {
+        const node = index.nodeById.get(result.name_en) || nodesByLowerId.get(result.name_en.toLowerCase());
+        if (node) semanticScores.set(node.vid, Number(result.score));
+        return node;
+      })
+      .filter(Boolean)
+      .filter((node) => matchesQuery(node, state.filters.query));
+  } else {
+    nodes = [...(state.data.nodes || [])]
+      .filter((node) => matchesQuery(node, state.filters.query))
+      .sort((a, b) => compareNodes(a, b, state.dataLanguage));
+  }
 
   updateStats(nodes);
-  renderList(nodes, { language: state.dataLanguage, index });
+  renderList(nodes, {
+    language: state.dataLanguage,
+    index,
+    semanticScores: state.semanticSearch.active ? semanticScores : null
+  });
+}
+
+function bindSemanticSearch() {
+  if (semanticSearchBound) return;
+  semanticSearchBound = true;
+  dom.semanticSearchForm?.addEventListener('submit', handleSemanticSearch);
+  dom.semanticClear?.addEventListener('click', () => {
+    resetSemanticSearch();
+    renderDataPage();
+  });
+}
+
+async function handleSemanticSearch(event) {
+  event.preventDefault();
+  const query = dom.semanticSearch?.value.trim() || '';
+  if (!query || !state.dataSource || state.displayType !== 'cards') return;
+
+  state.semanticSearch = {
+    businessName: state.dataSource,
+    query,
+    loading: true,
+    active: false,
+    results: [],
+    error: ''
+  };
+  state.filters.query = '';
+  if (dom.search) dom.search.value = '';
+  syncSemanticSearchUi();
+
+  try {
+    const params = new URLSearchParams({ business_name: state.dataSource, text: query });
+    const response = await api(`/api/nodes/semantic-search?${params}`);
+    state.semanticSearch.results = Array.isArray(response?.data) ? response.data : [];
+    state.semanticSearch.active = true;
+  } catch (error) {
+    state.semanticSearch.error = error.message || '语义搜索失败';
+  } finally {
+    state.semanticSearch.loading = false;
+    syncSemanticSearchUi();
+    renderDataPage();
+  }
+}
+
+function resetSemanticSearch() {
+  state.semanticSearch = {
+    businessName: '',
+    query: '',
+    loading: false,
+    active: false,
+    results: [],
+    error: ''
+  };
+  if (dom.semanticSearch) dom.semanticSearch.value = '';
+  syncSemanticSearchUi();
+}
+
+function syncSemanticSearchUi() {
+  if (dom.semanticSubmit) {
+    dom.semanticSubmit.disabled = state.semanticSearch.loading;
+    dom.semanticSubmit.textContent = state.semanticSearch.loading ? '搜索中…' : '搜索';
+  }
+  dom.semanticClear?.classList.toggle('is-hidden', !state.semanticSearch.active && !state.semanticSearch.error);
+  if (!dom.semanticStatus) return;
+  if (state.semanticSearch.loading) {
+    dom.semanticStatus.textContent = '正在进行混合检索与重排序…';
+    dom.semanticStatus.classList.remove('is-error');
+  } else if (state.semanticSearch.error) {
+    dom.semanticStatus.textContent = state.semanticSearch.error;
+    dom.semanticStatus.classList.add('is-error');
+  } else if (state.semanticSearch.active) {
+    dom.semanticStatus.textContent = `找到 ${state.semanticSearch.results.length} 个结果，已按语义分数排序。`;
+    dom.semanticStatus.classList.remove('is-error');
+  } else {
+    dom.semanticStatus.textContent = '';
+    dom.semanticStatus.classList.remove('is-error');
+  }
 }
 
 function renderGraphMain(options) {

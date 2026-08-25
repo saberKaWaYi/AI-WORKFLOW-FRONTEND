@@ -22,6 +22,14 @@ export const state = {
     data: null,
     characterId: '',
     sourceView: ''
+  },
+  semanticSearch: {
+    businessName: '',
+    query: '',
+    loading: false,
+    active: false,
+    results: [],
+    error: ''
   }
 };
 

@@ -38,11 +38,11 @@ app.use(express.static(path.join(path.dirname(fileURLToPath(import.meta.url)), "
   }
 }));
 
-async function proxy(url, res) {
+async function proxy(url, res, timeoutMs = collectorTimeoutMs) {
   try {
     const response = await fetch(url, {
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(collectorTimeoutMs)
+      signal: AbortSignal.timeout(timeoutMs)
     });
     const body = Buffer.from(await response.arrayBuffer());
     res.status(response.status);
@@ -62,6 +62,12 @@ app.get("/api/nodes", (req, res) => {
   const { business_name, name } = req.query;
   if (!business_name || !name) return res.status(400).json({ message: "business_name and name are required" });
   return proxy(`${collectorApi}/nodes?${new URLSearchParams({ business_name, name })}`, res);
+});
+app.get("/api/nodes/semantic-search", (req, res) => {
+  const { business_name, text } = req.query;
+  if (!business_name || !text) return res.status(400).json({ message: "business_name and text are required" });
+  const url = `${collectorApi}/nodes/semantic-search?${new URLSearchParams({ business_name, text })}`;
+  return proxy(url, res, Math.max(collectorTimeoutMs, 300000));
 });
 
 app.use("/api/auth", createAuthRouter({ sessionManager }));

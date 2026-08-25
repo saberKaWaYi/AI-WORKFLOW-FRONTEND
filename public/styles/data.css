@@ -53,6 +53,16 @@
 .filter-group .field:last-child { margin-bottom: 0; }
 .filter-group-title { margin: 0 0 12px; font-size: 12px; color: var(--muted); font-weight: 600; }
 
+.semantic-search-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.semantic-search-actions button { min-height: 40px; }
+.semantic-search-status { min-height: 18px; margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.semantic-search-status.is-error { color: var(--danger); }
+
 .config-box {
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -136,6 +146,20 @@
 .card-body { padding: 12px; }
 .card-body h3 { margin: 0; font-size: 17px; }
 .card-body p { margin: 6px 0 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+
+.semantic-score {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+}
+
+.semantic-score-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.semantic-score-head span { color: var(--muted); font-size: 12px; }
+.semantic-score-head strong { color: var(--accent); font-size: 13px; font-variant-numeric: tabular-nums; }
+.semantic-score-track { height: 5px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--line), transparent 20%); }
+.semantic-score-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
 
 .floating-related-panel {
   position: fixed;

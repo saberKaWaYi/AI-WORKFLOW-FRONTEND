@@ -213,14 +213,24 @@ export function renderList(nodes, options) {
     return;
   }
 
-  gridEl.innerHTML = nodes.map((node) => renderCard(node, language, index)).join('');
+  const semanticScores = options.semanticScores;
+  const scoreValues = semanticScores
+    ? nodes.map((node) => semanticScores.get(node.vid)).filter(Number.isFinite)
+    : [];
+  const scoreRange = scoreValues.length
+    ? { min: Math.min(...scoreValues), max: Math.max(...scoreValues) }
+    : null;
+
+  gridEl.innerHTML = nodes
+    .map((node) => renderCard(node, language, index, semanticScores?.get(node.vid), scoreRange))
+    .join('');
 
   if (panel.pinnedId || panel.hoveredId) {
     syncFloatingPanel();
   }
 }
 
-function renderCard(node, lang, dataIndex) {
+function renderCard(node, lang, dataIndex, semanticScore, scoreRange) {
   const image = node.properties.photo || '';
   const degree = dataIndex.degreeById.get(node.vid)?.total || 0;
   return `
@@ -233,8 +243,27 @@ function renderCard(node, lang, dataIndex) {
           <span class="chip">ID: ${escapeHtml(node.vid)}</span>
           <span class="chip">连接 ${degree}</span>
         </div>
+        ${renderSemanticScore(semanticScore, scoreRange)}
       </div>
     </article>
+  `;
+}
+
+function renderSemanticScore(score, range) {
+  if (!Number.isFinite(score) || !range) return '';
+  const spread = range.max - range.min;
+  const relative = spread > 0 ? (score - range.min) / spread : 1;
+  const width = Math.round(18 + relative * 82);
+  return `
+    <div class="semantic-score" title="原始重排序分数，数值越高表示与搜索文本越相关">
+      <div class="semantic-score-head">
+        <span>语义分数</span>
+        <strong>${escapeHtml(score.toFixed(3))}</strong>
+      </div>
+      <div class="semantic-score-track" aria-hidden="true">
+        <i style="width:${width}%"></i>
+      </div>
+    </div>
   `;
 }
 
