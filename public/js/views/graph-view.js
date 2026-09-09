@@ -9,12 +9,15 @@ import {
   seededPosition
 } from '../core/utils.js';
 import { edgeKey } from '../systems/data/network-index.js';
+import { buildFocusSelection, buildPathSelection } from './graph/selectors.js';
+import { LAYOUT_MODES, applyEdgeTension, applyRepulsion, layoutNodes, moveNodes } from './graph/layout.js';
 import {
   edgeEndpoint,
   getName,
   getRelationText
-} from '../systems/data/character-utils.js';
+} from '../systems/data/node-fields.js';
 
+/* ---------- 运行时状态 ---------- */
 const graph = {
   nodes: [],
   edges: [],
@@ -57,6 +60,7 @@ function themeRoot() {
   return document.querySelector('[data-theme-scope="data"]') || document.documentElement;
 }
 
+/* ---------- 对外接口 ---------- */
 export function initGraphView(canvasEl, tooltipEl, onSelect) {
   canvas = canvasEl;
   tooltip = tooltipEl;
@@ -86,83 +90,10 @@ export function renderGraph(input) {
   return { nodes: graph.nodes, edges: graph.edges };
 }
 
+/* ---------- 图数据构建 ---------- */
 function buildViewFilters() {
-  view.focus = buildFocusSelection();
-  view.path = buildPathSelection();
-}
-
-function buildFocusSelection() {
-  const { filters, index } = runtime;
-  const startId = filters.focusNodeId;
-  if (!startId || !index.nodeById.has(startId)) {
-    return { active: false, nodeIds: new Set() };
-  }
-
-  const maxDepth = Math.max(1, filters.focusDepth);
-  const nodeIds = new Set([startId]);
-  const queue = [{ nodeId: startId, depth: 0 }];
-
-  while (queue.length) {
-    const current = queue.shift();
-    if (current.depth >= maxDepth) continue;
-    for (const next of index.undirectedById.get(current.nodeId) || []) {
-      if (nodeIds.has(next.nodeId)) continue;
-      nodeIds.add(next.nodeId);
-      queue.push({ nodeId: next.nodeId, depth: current.depth + 1 });
-    }
-  }
-
-  return { active: true, startId, depth: maxDepth, nodeIds };
-}
-
-function buildPathSelection() {
-  const { filters, index } = runtime;
-  const sourceId = filters.pathSourceId;
-  const targetId = filters.pathTargetId;
-  const empty = { active: false, found: false, nodeIds: new Set(), edgeKeys: new Set(), steps: 0 };
-
-  if (!sourceId || !targetId || !index.nodeById.has(sourceId) || !index.nodeById.has(targetId)) {
-    return empty;
-  }
-
-  if (sourceId === targetId) {
-    return { active: true, found: true, sourceId, targetId, nodeIds: new Set([sourceId]), edgeKeys: new Set(), steps: 0 };
-  }
-
-  const queue = [sourceId];
-  const visited = new Set([sourceId]);
-  const previous = new Map();
-
-  while (queue.length) {
-    const currentId = queue.shift();
-    for (const next of index.outgoingById.get(currentId) || []) {
-      if (visited.has(next.nodeId)) continue;
-      visited.add(next.nodeId);
-      previous.set(next.nodeId, { fromId: currentId, edge: next.edge });
-      if (next.nodeId === targetId) return buildResolvedPath(sourceId, targetId, previous);
-      queue.push(next.nodeId);
-    }
-  }
-
-  return { active: true, found: false, sourceId, targetId, nodeIds: new Set([sourceId, targetId]), edgeKeys: new Set(), steps: 0 };
-}
-
-function buildResolvedPath(sourceId, targetId, previous) {
-  const nodeIds = new Set([targetId]);
-  const edgeKeys = new Set();
-  let currentId = targetId;
-  let steps = 0;
-
-  while (currentId !== sourceId) {
-    const item = previous.get(currentId);
-    if (!item) break;
-    steps += 1;
-    edgeKeys.add(edgeKey(item.edge));
-    nodeIds.add(item.fromId);
-    currentId = item.fromId;
-  }
-
-  return { active: true, found: true, sourceId, targetId, nodeIds, edgeKeys, steps };
+  view.focus = buildFocusSelection(runtime);
+  view.path = buildPathSelection(runtime);
 }
 
 function buildVisibleNodeIds() {
@@ -203,63 +134,23 @@ function buildGraphEdges(visibleEdgeKeys) {
     .map((edge) => ({ ...edge, isPath: view.path.edgeKeys.has(edgeKey(edge)) }));
 }
 
+/* ---------- 布局与力导 ---------- */
 function applyLayout(resetVelocity) {
   if (!canvas) return;
 
-  const width = canvas.clientWidth;
-  const height = canvas.clientHeight;
-  const centerX = width / 2;
-  const centerY = height / 2;
   const nodes = [...graph.nodes].sort((a, b) => b.degree.total - a.degree.total);
-  const layout = runtime.filters.layout;
+  const mode = runtime.filters.layout;
 
-  nodes.forEach((node, index) => {
-    if (resetVelocity) node.vx = node.vy = 0;
-
-    if (layout === 'circle') placeCircleNode(node, index, nodes.length, centerX, centerY, width, height);
-    else if (layout === 'radial') placeRadialNode(node, index, nodes, centerX, centerY, width, height);
-    else if (layout === 'columns') placeColumnNode(node, index, width, height);
-    else placeSeedNode(node, index, centerX, centerY, width, height);
-  });
+  if (resetVelocity) nodes.forEach((node) => { node.vx = 0; node.vy = 0; });
+  layoutNodes(nodes, { mode, width: canvas.clientWidth, height: canvas.clientHeight });
 
   graph.running = true;
-  graph.cooling = layout === 'force' ? 1 : 0;
+  graph.cooling = mode === LAYOUT_MODES.FORCE ? 1 : 0;
   drawGraph();
 }
 
-function placeCircleNode(node, index, count, centerX, centerY, width, height) {
-  const angle = (Math.PI * 2 * index) / Math.max(1, count);
-  const radius = Math.min(width, height) * 0.38;
-  node.x = centerX + Math.cos(angle) * radius;
-  node.y = centerY + Math.sin(angle) * radius;
-}
-
-function placeRadialNode(node, index, nodes, centerX, centerY, width, height) {
-  const topDegree = Math.max(1, nodes[0]?.degree.total || 1);
-  const ring = 1 - (node.degree.total || 1) / topDegree;
-  const angle = (Math.PI * 2 * index * 0.618) % (Math.PI * 2);
-  const radius = Math.min(width, height) * (0.08 + ring * 0.38);
-  node.x = centerX + Math.cos(angle) * radius;
-  node.y = centerY + Math.sin(angle) * radius;
-}
-
-function placeColumnNode(node, index, width, height) {
-  const balance = node.degree.out - node.degree.in;
-  const column = balance > 3 ? 0.25 : balance < -3 ? 0.75 : 0.5;
-  node.x = width * column + (seededPosition(index, node.vid).x - 0.5) * 50;
-  node.y = 56 + (index % Math.max(1, Math.floor(height / 42))) * 42;
-}
-
-function placeSeedNode(node, index, centerX, centerY, width, height) {
-  const seed = seededPosition(index, node.vid);
-  const angle = Math.PI * 2 * seed.x;
-  const radius = Math.min(width, height) * (0.1 + seed.y * 0.28);
-  node.x = centerX + Math.cos(angle) * radius;
-  node.y = centerY + Math.sin(angle) * radius;
-}
-
 function animationLoop() {
-  if (runtime?.active && runtime.filters.layout === 'force' && graph.running) {
+  if (runtime?.active && runtime.filters.layout === LAYOUT_MODES.FORCE && graph.running) {
     simulateForceLayout();
   }
   if (runtime?.active) drawGraph();
@@ -267,78 +158,25 @@ function animationLoop() {
 }
 
 function simulateForceLayout() {
-  for (let i = 0; i < 2; i++) {
-    applyRepulsion();
-    applyEdgeTension();
-    moveNodes();
-  }
-}
-
-function applyRepulsion() {
-  graph.nodes.forEach((a, i) => {
-    for (let j = i + 1; j < graph.nodes.length; j++) {
-      const b = graph.nodes[j];
-      const dx = a.x - b.x || 0.01;
-      const dy = a.y - b.y || 0.01;
-      const distanceSquared = dx * dx + dy * dy;
-      const force = Math.min(1.8, 780 / distanceSquared) * graph.cooling;
-      const distance = Math.sqrt(distanceSquared);
-      a.vx += (dx / distance) * force;
-      a.vy += (dy / distance) * force;
-      b.vx -= (dx / distance) * force;
-      b.vy -= (dy / distance) * force;
-    }
-  });
-}
-
-function applyEdgeTension() {
-  graph.edges.forEach((edge) => {
-    const source = graph.nodeMap.get(edge.source_vid);
-    const target = graph.nodeMap.get(edge.target_vid);
-    if (!source || !target) return;
-    const dx = target.x - source.x;
-    const dy = target.y - source.y;
-    const distance = Math.sqrt(dx * dx + dy * dy) || 1;
-    const targetDistance = 72 + Math.min(55, (source.r + target.r) * 2.2);
-    const force = (distance - targetDistance) * 0.0009 * graph.cooling;
-    source.vx += dx * force;
-    source.vy += dy * force;
-    target.vx -= dx * force;
-    target.vy -= dy * force;
-  });
-}
-
-function moveNodes() {
   if (!canvas) return;
 
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
-  const centerX = width / 2;
-  const centerY = height / 2;
-  let energy = 0;
 
-  graph.nodes.forEach((node) => {
-    if (node.fixed) return;
-    node.vx += (centerX - node.x) * 0.006 * graph.cooling;
-    node.vy += (centerY - node.y) * 0.006 * graph.cooling;
-    node.vx *= 0.72;
-    node.vy *= 0.72;
+  for (let i = 0; i < 2; i++) {
+    applyRepulsion(graph.nodes, graph.cooling);
+    applyEdgeTension(graph.edges, graph.nodeMap, graph.cooling);
 
-    const speed = Math.hypot(node.vx, node.vy);
-    if (speed > 5) {
-      node.vx = (node.vx / speed) * 5;
-      node.vy = (node.vy / speed) * 5;
+    const energy = moveNodes(graph.nodes, { width, height, cooling: graph.cooling });
+    graph.cooling *= 0.985;
+    if (graph.cooling < 0.035 || energy < 0.08) {
+      graph.running = false;
+      break;
     }
-
-    node.x = Math.max(node.r + 8, Math.min(width - node.r - 8, node.x + node.vx));
-    node.y = Math.max(node.r + 8, Math.min(height - node.r - 8, node.y + node.vy));
-    energy += Math.abs(node.vx) + Math.abs(node.vy);
-  });
-
-  graph.cooling *= 0.985;
-  if (graph.cooling < 0.035 || energy < 0.08) graph.running = false;
+  }
 }
 
+/* ---------- Canvas 绘制 ---------- */
 function drawGraph() {
   if (!canvas) return;
 
@@ -472,6 +310,7 @@ function preloadNodeImage(node) {
   graph.imageCache.set(url, entry);
 }
 
+/* ---------- 交互事件 ---------- */
 function bindCanvasEvents() {
   if (!canvas) return;
 

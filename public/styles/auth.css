@@ -57,6 +57,7 @@
   gap: 10px;
   padding: 24px 20px;
   border: 1px solid var(--line);
+  border-top: 3px solid var(--card-accent, var(--accent));
   border-radius: 16px;
   background: var(--panel);
   box-shadow: var(--shadow);
@@ -67,18 +68,16 @@
 .portal-card:hover { transform: translateY(-3px); }
 .portal-card strong { font-size: 18px; }
 .portal-card span { color: var(--muted); font-size: 13px; line-height: 1.5; }
-.portal-card em { color: var(--accent); font-style: normal; font-size: 13px; font-weight: 600; }
+.portal-card em { color: var(--card-accent, var(--accent)); font-style: normal; font-size: 13px; font-weight: 600; }
 .portal-icon { font-size: 28px; }
 
-.portal-card-data { border-top: 3px solid var(--accent-data); }
-.portal-card-text { border-top: 3px solid var(--accent-text); }
-.portal-card-video { border-top: 3px solid var(--accent-video); }
-.portal-card-admin { border-top: 3px solid var(--accent-admin); }
-
-.portal-card-data em { color: var(--accent-data); }
-.portal-card-text em { color: var(--accent-text); }
-.portal-card-video em { color: var(--accent-video); }
-.portal-card-admin em { color: var(--accent-admin); }
+/* 卡片强调色由所属系统决定：新增系统只需在此补一行。 */
+.portal-card[data-system-card="data"] { --card-accent: var(--accent-data); }
+.portal-card[data-system-card="text"] { --card-accent: var(--accent-text); }
+.portal-card[data-system-card="video"] { --card-accent: var(--accent-video); }
+.portal-card[data-system-card="image"] { --card-accent: var(--accent-image); }
+.portal-card[data-system-card="voice"] { --card-accent: var(--accent-voice); }
+.portal-card[data-system-card="admin"] { --card-accent: var(--accent-admin); }
 
 .auth-panel-wrap { width: min(420px, 100%); }
 .auth-back {

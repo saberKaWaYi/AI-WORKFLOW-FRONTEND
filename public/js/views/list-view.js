@@ -1,6 +1,6 @@
 import { DATA_TEXT } from '../core/state.js';
 import { cssEscape, escapeHtml } from '../core/utils.js';
-import { getName, getOtherName, edgeEndpoint, getRelationText } from '../systems/data/character-utils.js';
+import { getName, getOtherName, edgeEndpoint, getRelationText } from '../systems/data/node-fields.js';
 import { getRelatedNodes } from '../systems/data/network-index.js';
 
 let gridEl = null;
@@ -40,29 +40,29 @@ export function closeListPanel() {
 }
 
 function onGridClick(event) {
-  const card = event.target.closest('[data-character-id]');
+  const card = event.target.closest('[data-node-id]');
   if (!card || !onNodeSelect) return;
-  onNodeSelect(card.dataset.characterId);
+  onNodeSelect(card.dataset.nodeId);
 }
 
 function onGridKeyDown(event) {
   if (event.key !== 'Enter' && event.key !== ' ') return;
-  const card = event.target.closest('[data-character-id]');
+  const card = event.target.closest('[data-node-id]');
   if (!card || !onNodeSelect) return;
   event.preventDefault();
-  onNodeSelect(card.dataset.characterId);
+  onNodeSelect(card.dataset.nodeId);
 }
 
 function onCardHover(event) {
   if (panel.pinnedId) return;
-  const card = event.target.closest('[data-character-id]');
+  const card = event.target.closest('[data-node-id]');
   if (!card) return;
-  showFloatingPanel(card.dataset.characterId);
+  showFloatingPanel(card.dataset.nodeId);
 }
 
 function onCardLeave(event) {
   if (panel.pinnedId) return;
-  const card = event.target.closest('[data-character-id]');
+  const card = event.target.closest('[data-node-id]');
   if (!card) return;
   if (card.contains(event.relatedTarget)) return;
   if (event.relatedTarget?.closest?.('[data-floating-panel]')) return;
@@ -92,8 +92,8 @@ function onDocumentClick(event) {
   closeListPanel();
 }
 
-function showFloatingPanel(characterId) {
-  panel.hoveredId = characterId;
+function showFloatingPanel(nodeId) {
+  panel.hoveredId = nodeId;
   syncFloatingPanel();
 }
 
@@ -102,10 +102,10 @@ function hideFloatingPanel() {
   updatePanelVisibility(false);
 }
 
-function openCharacterPanel(characterId) {
-  panel.hoveredId = characterId;
-  panel.pinnedId = characterId;
-  document.querySelector(`[data-character-id="${cssEscape(characterId)}"]`)?.scrollIntoView({
+function openCharacterPanel(nodeId) {
+  panel.hoveredId = nodeId;
+  panel.pinnedId = nodeId;
+  document.querySelector(`[data-node-id="${cssEscape(nodeId)}"]`)?.scrollIntoView({
     behavior: 'smooth',
     block: 'center'
   });
@@ -119,7 +119,7 @@ function syncFloatingPanel() {
     return;
   }
 
-  const anchor = document.querySelector(`[data-character-id="${cssEscape(activeId)}"]`);
+  const anchor = document.querySelector(`[data-node-id="${cssEscape(activeId)}"]`);
   if (!anchor) {
     updatePanelVisibility(false);
     return;
@@ -132,8 +132,8 @@ function syncFloatingPanel() {
   positionFloatingPanel(anchor, panelEl);
 }
 
-function renderRelatedList(characterId) {
-  const relatedList = getRelatedNodes(index || { relatedById: new Map() }, characterId);
+function renderRelatedList(nodeId) {
+  const relatedList = getRelatedNodes(index || { relatedById: new Map() }, nodeId);
   if (!relatedList.length) {
     return `<div class="related-empty">${escapeHtml(DATA_TEXT.noRelated)}</div>`;
   }
@@ -234,7 +234,7 @@ function renderCard(node, lang, dataIndex, semanticScore, scoreRange) {
   const image = node.properties.photo || '';
   const degree = dataIndex.degreeById.get(node.vid)?.total || 0;
   return `
-    <article class="character-card" data-character-id="${escapeHtml(node.vid)}" role="button" tabindex="0">
+    <article class="node-card" data-node-id="${escapeHtml(node.vid)}" role="button" tabindex="0">
       <div class="portrait">${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(getName(node, lang))}" loading="lazy">` : ''}</div>
       <div class="card-body">
         <h3>${escapeHtml(getName(node, lang))}</h3>
@@ -255,9 +255,9 @@ function renderSemanticScore(score, range) {
   const relative = spread > 0 ? (score - range.min) / spread : 1;
   const width = Math.round(18 + relative * 82);
   return `
-    <div class="semantic-score" title="原始重排序分数，数值越高表示与搜索文本越相关">
+    <div class="semantic-score" title="综合排序分数，数值越高表示与搜索文本越相关">
       <div class="semantic-score-head">
-        <span>语义分数</span>
+        <span>综合相关分数</span>
         <strong>${escapeHtml(score.toFixed(3))}</strong>
       </div>
       <div class="semantic-score-track" aria-hidden="true">

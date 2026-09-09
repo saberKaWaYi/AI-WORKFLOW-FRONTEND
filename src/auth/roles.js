@@ -5,8 +5,14 @@ export const ROLES = {
   GUEST: "guest"
 };
 
-export const ALL_SYSTEMS = ["data", "text", "video", "admin"];
-export const ASSIGNABLE_SYSTEMS = ["data", "text", "video"];
+/** 管理入口：不是业务系统，不参与分配，能否进入由角色决定。 */
+export const ADMIN_SYSTEM = "admin";
+
+/** 全部系统标识 = 业务系统 + 管理入口，顺序与前端保持一致。 */
+export const ALL_SYSTEMS = ["data", "text", "image", "voice", "video", ADMIN_SYSTEM];
+
+/** 可分配给普通用户的业务系统；新增业务系统只需加进 ALL_SYSTEMS。 */
+export const ASSIGNABLE_SYSTEMS = ALL_SYSTEMS.filter((system) => system !== ADMIN_SYSTEM);
 export const DEFAULT_USER_SYSTEMS = ["data"];
 export const GUEST_SYSTEMS = ["data"];
 
@@ -23,6 +29,8 @@ export const ROLE_LABELS = {
 export const SYSTEM_LABELS = {
   data: "Data",
   text: "Text AI",
+  image: "Image AI",
+  voice: "Audio AI",
   video: "Video AI",
   admin: "Admin"
 };
@@ -65,7 +73,11 @@ export function canAssignRole(operatorRole, targetRole) {
   return targetRole === ROLES.USER;
 }
 
-export function canEditUser(operator, target) {
+/**
+ * 判断操作者是否有权处置目标用户。
+ * 编辑与删除采用同一套规则，故共用实现。
+ */
+export function canManageUser(operator, target) {
   if (!operator || !target) return false;
   if (operator.id === target.id) return false;
   if (target.role === ROLES.ULTIMATE) return false;
@@ -74,11 +86,5 @@ export function canEditUser(operator, target) {
   return false;
 }
 
-export function canDeleteUser(operator, target) {
-  if (!operator || !target) return false;
-  if (operator.id === target.id) return false;
-  if (target.role === ROLES.ULTIMATE) return false;
-  if (operator.role === ROLES.ULTIMATE) return true;
-  if (operator.role === ROLES.SUPER) return target.role === ROLES.USER;
-  return false;
-}
+export const canEditUser = canManageUser;
+export const canDeleteUser = canManageUser;

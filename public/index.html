@@ -23,25 +23,37 @@
           <p>请选择要进入的系统</p>
         </header>
         <div class="portal-grid">
-          <button class="portal-card portal-card-data" type="button" data-system-card="data">
+          <button class="portal-card" type="button" data-system-card="data">
             <span class="portal-icon">▦</span>
             <strong>数据展示</strong>
             <span>角色关系网络可视化</span>
             <em>进入</em>
           </button>
-          <button class="portal-card portal-card-text" type="button" data-system-card="text">
+          <button class="portal-card" type="button" data-system-card="text">
             <span class="portal-icon">⎘</span>
-            <strong>文本 AI 任务链</strong>
+            <strong>文本AI任务链</strong>
             <span>文本生成与编排工作流</span>
             <em>进入</em>
           </button>
-          <button class="portal-card portal-card-video" type="button" data-system-card="video">
+          <button class="portal-card" type="button" data-system-card="image">
+            <span class="portal-icon">▣</span>
+            <strong>图片AI任务链</strong>
+            <span>图片生成与编辑工作流</span>
+            <em>进入</em>
+          </button>
+          <button class="portal-card" type="button" data-system-card="voice">
+            <span class="portal-icon">♪</span>
+            <strong>音频AI任务链</strong>
+            <span>音频生成与配音工作流</span>
+            <em>进入</em>
+          </button>
+          <button class="portal-card" type="button" data-system-card="video">
             <span class="portal-icon">▶</span>
-            <strong>视频 AI 任务链</strong>
+            <strong>视频AI任务链</strong>
             <span>视频生成与剪辑工作流</span>
             <em>进入</em>
           </button>
-          <button class="portal-card portal-card-admin" type="button" data-system-card="admin">
+          <button class="portal-card" type="button" data-system-card="admin">
             <span class="portal-icon">⚙</span>
             <strong>系统管理</strong>
             <span>账号与权限管理</span>
@@ -190,10 +202,12 @@
                 </div>
                 <div class="semantic-search-actions">
                   <button class="primary-btn" type="submit" data-semantic-submit>搜索</button>
-                  <button class="ghost-btn is-hidden" type="button" data-semantic-clear>清除</button>
                 </div>
               </form>
-              <p class="semantic-search-status" data-semantic-status></p>
+              <div class="semantic-search-footer">
+                <p class="semantic-search-status" data-semantic-status></p>
+                <button class="ghost-btn semantic-clear is-hidden" type="button" data-semantic-clear>清除</button>
+              </div>
             </div>
           </div>
 
@@ -215,7 +229,7 @@
             </div>
           </header>
 
-          <section id="characterGrid" class="grid is-hidden" data-view="cards"></section>
+          <section id="nodeGrid" class="grid is-hidden" data-view="cards"></section>
 
           <div class="floating-related-panel" data-floating-panel>
             <h4 data-floating-title>相关角色</h4>
@@ -240,7 +254,7 @@
         <aside class="sidebar sidebar-text">
           <div class="sidebar-top">
             <div class="brand">
-              <strong data-text-title>文本 AI 任务链</strong>
+              <strong data-text-title>文本AI任务链</strong>
               <span class="micro" data-text-subtitle>文本生成与编排工作流</span>
             </div>
           </div>
@@ -259,7 +273,7 @@
         <main class="main">
           <div class="dev-page" data-text-main>
             <p class="dev-notice">还在开发中</p>
-            <p class="dev-desc">文本 AI 任务链功能即将上线</p>
+            <p class="dev-desc">文本AI任务链功能即将上线</p>
           </div>
         </main>
       </div>
@@ -268,7 +282,7 @@
         <aside class="sidebar sidebar-video">
           <div class="sidebar-top">
             <div class="brand">
-              <strong data-video-title>视频 AI 任务链</strong>
+              <strong data-video-title>视频AI任务链</strong>
               <span class="micro" data-video-subtitle>视频生成与剪辑工作流</span>
             </div>
           </div>
@@ -287,7 +301,63 @@
         <main class="main">
           <div class="dev-page" data-video-main>
             <p class="dev-notice">还在开发中</p>
-            <p class="dev-desc">视频 AI 任务链功能即将上线</p>
+            <p class="dev-desc">视频AI任务链功能即将上线</p>
+          </div>
+        </main>
+      </div>
+
+      <div class="app-shell theme-scope shell-image is-hidden" data-app-shell data-theme-scope="image" data-shell="image">
+        <aside class="sidebar sidebar-image">
+          <div class="sidebar-top">
+            <div class="brand">
+              <strong data-image-title>图片AI任务链</strong>
+              <span class="micro" data-image-subtitle>图片生成与编辑工作流</span>
+            </div>
+          </div>
+          <div class="panel-section">
+            <button class="theme-icon-btn" type="button" data-theme-toggle title="切换主题">
+              <span data-theme-icon>☀</span>
+            </button>
+          </div>
+          <div class="panel-section sidebar-greeting">
+            <p data-image-greeting></p>
+          </div>
+          <div class="panel-section">
+            <button class="theme-btn" type="button" data-logout>退出登录</button>
+          </div>
+        </aside>
+        <main class="main">
+          <div class="dev-page" data-image-main>
+            <p class="dev-notice">还在开发中</p>
+            <p class="dev-desc">图片AI任务链功能即将上线</p>
+          </div>
+        </main>
+      </div>
+
+      <div class="app-shell theme-scope shell-voice is-hidden" data-app-shell data-theme-scope="voice" data-shell="voice">
+        <aside class="sidebar sidebar-voice">
+          <div class="sidebar-top">
+            <div class="brand">
+              <strong data-voice-title>音频AI任务链</strong>
+              <span class="micro" data-voice-subtitle>音频生成与配音工作流</span>
+            </div>
+          </div>
+          <div class="panel-section">
+            <button class="theme-icon-btn" type="button" data-theme-toggle title="切换主题">
+              <span data-theme-icon>☀</span>
+            </button>
+          </div>
+          <div class="panel-section sidebar-greeting">
+            <p data-voice-greeting></p>
+          </div>
+          <div class="panel-section">
+            <button class="theme-btn" type="button" data-logout>退出登录</button>
+          </div>
+        </aside>
+        <main class="main">
+          <div class="dev-page" data-voice-main>
+            <p class="dev-notice">还在开发中</p>
+            <p class="dev-desc">音频AI任务链功能即将上线</p>
           </div>
         </main>
       </div>

@@ -28,7 +28,7 @@ export function createAuthRouter({ sessionManager }) {
   router.post("/guest", async (req, res) => {
     const system = parseEntrySystem(req.body.entrySystem);
     if (!system) return res.status(400).json({ message: "entrySystem is required" });
-    if (!canAccess(ROLES.GUEST, [], system)) return res.status(403).json({ message: "无权进入该系统" });
+    if (!canAccess(ROLES.GUEST, [], system)) return res.status(403).json({ message: "当前账号没有该系统的访问权限" });
 
     const user = await sessionManager.writeSession(res, sessionManager.buildGuestPayload(), guestSessionTtl);
     res.status(201).json({ user });
@@ -73,7 +73,7 @@ export function createAuthRouter({ sessionManager }) {
     }
     if (!user.is_active) return res.status(403).json({ message: "账号已被禁用" });
     if (!canAccess(user.role, parseStoredSystems(user), system)) {
-      return res.status(403).json({ message: "无权进入该系统" });
+      return res.status(403).json({ message: "当前账号没有该系统的访问权限" });
     }
 
     await touchLastLogin(user.id);

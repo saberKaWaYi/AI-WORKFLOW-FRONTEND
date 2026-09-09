@@ -63,9 +63,16 @@ async function submitAuth(action) {
   showAuthMessage('');
   const systemId = getSelectedSystem();
   setSelectedSystem(systemId);
+  const previousPage = state.page;
   state.page = systemId;
-  const result = await action();
-  onAuthenticated?.(result.user, systemId);
+  try {
+    const result = await action();
+    onAuthenticated?.(result.user, systemId);
+  } catch (error) {
+    // 常见分支：账号无该系统权限、账号被禁用、账号或密码错误。
+    state.page = previousPage;
+    showAuthMessage(error?.message || '登录失败，请稍后重试');
+  }
 }
 
 function showAuthMessage(message) {

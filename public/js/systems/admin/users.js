@@ -1,4 +1,5 @@
 import { api } from '../../core/api.js';
+import { SYSTEM_IDS } from '../../core/constants.js';
 import { ALL_SYSTEMS, ASSIGNABLE_SYSTEMS, ROLE_LABELS, ROLES, SYSTEM_LABELS, isAdminUser } from '../../auth/portal.js';
 
 const SEARCH_FIELDS = [
@@ -54,7 +55,7 @@ function renderSystemCheckboxes(user, locked) {
 }
 
 function getSuperHelp(role) {
-  return role === ROLES.SUPER ? '该角色默认拥有全部系统权限' : '';
+  return role === ROLES.SUPER ? '该角色默认拥有全部系统权限（含系统管理）' : '';
 }
 
 function renderRowActions(user, currentUser) {
@@ -63,7 +64,11 @@ function renderRowActions(user, currentUser) {
   if (!editable && !deletable) return '<span class="admin-muted">—</span>';
 
   const canEditRole = currentUser?.role === ROLES.ULTIMATE && user.role !== ROLES.ULTIMATE;
-  const canShowPermissions = editable && user.role === ROLES.SUPER;
+  /**
+   * 系统权限对所有可编辑用户都展示；
+   * 只有普通用户的权限可以勾选修改，超级及以上默认拥有全部，只读呈现。
+   */
+  const permissionsLocked = user.role !== ROLES.USER;
 
   return `
     <div class="admin-row-actions">
@@ -85,17 +90,15 @@ function renderRowActions(user, currentUser) {
               </section>
             ` : ''}
 
-            ${canShowPermissions ? `
-              <section class="admin-edit-section">
-                <h3 class="admin-edit-section-title">系统权限</h3>
-                <div class="admin-field">
-                  <span class="admin-helptext" data-super-help>${getSuperHelp(user.role)}</span>
-                  <div class="admin-systems admin-systems-inline is-locked" data-permissions-user>
-                    ${renderSystemCheckboxes(user, true)}
-                  </div>
+            <section class="admin-edit-section">
+              <h3 class="admin-edit-section-title">系统权限</h3>
+              <div class="admin-field">
+                <span class="admin-helptext" data-super-help>${getSuperHelp(user.role)}</span>
+                <div class="admin-systems admin-systems-inline${permissionsLocked ? ' is-locked' : ''}" data-permissions-user>
+                  ${renderSystemCheckboxes(user, permissionsLocked)}
                 </div>
-              </section>
-            ` : ''}
+              </div>
+            </section>
 
             <section class="admin-edit-section">
               <h3 class="admin-edit-section-title">账号状态</h3>
@@ -154,7 +157,7 @@ function syncCreateFormSystems(form) {
 
   checkboxes.forEach((input) => {
     input.disabled = isSuper;
-    input.checked = isSuper || input.value === 'data';
+    input.checked = isSuper || input.value === SYSTEM_IDS.DATA;
   });
 
   fieldset?.classList.toggle('is-locked', isSuper);
@@ -288,7 +291,7 @@ function bindRowActions(container, currentUser) {
       permissions?.classList.toggle('is-locked', !isUser);
       permissions?.querySelectorAll('[data-system]').forEach((input) => {
         input.disabled = !isUser;
-        input.checked = !isUser || input.dataset.system === 'data';
+        input.checked = !isUser || input.dataset.system === SYSTEM_IDS.DATA;
       });
     });
   });
@@ -399,7 +402,7 @@ export async function renderUsersPanel(container, currentUser) {
             <legend>系统权限</legend>
             ${ASSIGNABLE_SYSTEMS.map((id) => `
               <label class="admin-chip">
-                <input type="checkbox" name="allowedSystems" value="${id}" ${id === 'data' ? 'checked' : ''} />
+                <input type="checkbox" name="allowedSystems" value="${id}" ${id === SYSTEM_IDS.DATA ? 'checked' : ''} />
                 <span>${SYSTEM_LABELS[id]}</span>
               </label>
             `).join('')}

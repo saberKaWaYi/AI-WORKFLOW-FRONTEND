@@ -23,6 +23,8 @@
 
 .sidebar-text { border-right-color: color-mix(in srgb, var(--accent-text), var(--line) 60%); }
 .sidebar-video { border-right-color: color-mix(in srgb, var(--accent-video), var(--line) 60%); }
+.sidebar-image { border-right-color: color-mix(in srgb, var(--accent-image), var(--line) 60%); }
+.sidebar-voice { border-right-color: color-mix(in srgb, var(--accent-voice), var(--line) 60%); }
 
 .sidebar-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .brand { display: grid; gap: 2px; }
@@ -53,15 +55,34 @@
 .filter-group .field:last-child { margin-bottom: 0; }
 .filter-group-title { margin: 0 0 12px; font-size: 12px; color: var(--muted); font-weight: 600; }
 
-.semantic-search-actions {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-}
-
+/* 搜索按钮独占一行：「清除」出现时不挤压主按钮，只在状态行右侧安静显示 */
+.semantic-search-actions { display: grid; }
 .semantic-search-actions button { min-height: 40px; }
-.semantic-search-status { min-height: 18px; margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+.semantic-search-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+.semantic-search-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
 .semantic-search-status.is-error { color: var(--danger); }
+.semantic-clear {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
 
 .config-box {
   border: 1px solid var(--line);
@@ -119,7 +140,7 @@
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
 
-.character-card {
+.node-card {
   border: 1px solid var(--line);
   border-radius: 8px;
   overflow: hidden;
@@ -129,7 +150,7 @@
   cursor: pointer;
 }
 
-.character-card:hover {
+.node-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 18px 36px rgba(0, 0, 0, 0.08);
   border-color: color-mix(in srgb, var(--accent), var(--line) 36%);

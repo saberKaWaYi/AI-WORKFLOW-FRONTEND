@@ -1,43 +1,86 @@
 import { DATA_TEXT, state } from '../../core/state.js';
 import { api } from '../../core/api.js';
+import { DETAIL_SOURCE_VIEWS, DISPLAY_TYPES, SYSTEM_IDS } from '../../core/constants.js';
 import { formatText } from '../../core/utils.js';
 import { navigateToDataMain, navigateToDetail } from '../../core/router.js';
-import { compareNodes } from './character-utils.js';
+import { compareNodes } from './node-fields.js';
 import { getDataIndex, initConfigPanel, loadBusinesses, restoreConfigFromState, syncFilterUiValues } from './config-panel.js';
+import { findNodeByKey } from './network-index.js';
 import { initListView, renderList, matchesQuery, closeListPanel } from '../../views/list-view.js';
 import { initGraphView, renderGraph, setGraphActive, refreshGraphLayout } from '../../views/graph-view.js';
 import { initDetailView, showDetail, hideDetail } from '../../views/detail-view.js';
 
 let dom = {};
-let currentRoute = { system: 'data', page: 'main' };
+let currentRoute = { system: SYSTEM_IDS.DATA, page: 'main' };
 let semanticSearchBound = false;
 
+/** 数据系统所需的 DOM 元素，从完整 dom 集合中显式挑选，明确依赖范围。 */
+const DATA_DOM_KEYS = [
+  'cardGrid',
+  'floatingPanel',
+  'floatingTitle',
+  'floatingContent',
+  'graphWrap',
+  'graphCanvas',
+  'graphTooltip',
+  'detailView',
+  'emptyPage',
+  'mainHeader',
+  'statusText',
+  'totalCount',
+  'visibleCount',
+  'edgeCount',
+  'dataSource',
+  'dataLanguage',
+  'displayType',
+  'graphFilterSection',
+  'cardsFilterSection',
+  'search',
+  'semanticSearchForm',
+  'semanticSearch',
+  'semanticSubmit',
+  'semanticClear',
+  'semanticStatus',
+  'focusNode',
+  'focusDepth',
+  'pathSource',
+  'pathTarget',
+  'sizeMode',
+  'layout'
+];
+
+const CONFIG_PANEL_KEYS = [
+  'dataSource',
+  'dataLanguage',
+  'displayType',
+  'graphFilterSection',
+  'cardsFilterSection',
+  'search',
+  'focusNode',
+  'focusDepth',
+  'pathSource',
+  'pathTarget',
+  'sizeMode',
+  'layout'
+];
+
+function pickKeys(source, keys) {
+  return Object.fromEntries(keys.map((key) => [key, source[key]]));
+}
+
 export function initDataApp(elements) {
-  dom = elements;
+  dom = pickKeys(elements, DATA_DOM_KEYS);
   bindSemanticSearch();
 
   initListView(
-    dom.grid,
+    dom.cardGrid,
     { panel: dom.floatingPanel, title: dom.floatingTitle, content: dom.floatingContent },
-    (characterId) => navigateToDetail(characterId, 'cards')
+    (nodeId) => navigateToDetail(nodeId, DETAIL_SOURCE_VIEWS.CARDS)
   );
-  initGraphView(dom.canvas, dom.tooltip, (characterId) => navigateToDetail(characterId, 'graph'));
+  initGraphView(dom.graphCanvas, dom.graphTooltip, (nodeId) => navigateToDetail(nodeId, DETAIL_SOURCE_VIEWS.GRAPH));
   initDetailView(dom.detailView, () => navigateToDataMain());
   initConfigPanel(
-    {
-      dataSource: dom.dataSource,
-      dataLanguage: dom.dataLanguage,
-      displayType: dom.displayType,
-      graphFilterSection: dom.graphFilterSection,
-      cardsFilterSection: dom.cardsFilterSection,
-      search: dom.search,
-      focusNode: dom.focusNode,
-      focusDepth: dom.focusDepth,
-      pathSource: dom.pathSource,
-      pathTarget: dom.pathTarget,
-      sizeMode: dom.sizeMode,
-      layout: dom.layout
-    },
+    pickKeys(dom, CONFIG_PANEL_KEYS),
     (options) => renderDataPage(options)
   );
 
@@ -72,24 +115,24 @@ function renderDataPage(options = {}) {
 
   dom.emptyPage?.classList.remove('is-hidden');
   dom.mainHeader?.classList.add('is-hidden');
-  dom.grid?.classList.add('is-hidden');
+  dom.cardGrid?.classList.add('is-hidden');
   dom.graphWrap?.classList.add('is-hidden');
 
   if (!state.dataLoaded || !state.view) {
-    dom.status.textContent = '';
-    dom.total.textContent = '0';
-    dom.visible.textContent = '0';
-    dom.edges.textContent = '0';
+    dom.statusText.textContent = '';
+    dom.totalCount.textContent = '0';
+    dom.visibleCount.textContent = '0';
+    dom.edgeCount.textContent = '0';
     return;
   }
 
   dom.emptyPage?.classList.add('is-hidden');
   dom.mainHeader?.classList.remove('is-hidden');
 
-  if (state.view === 'cards') {
-    dom.grid?.classList.remove('is-hidden');
+  if (state.view === DISPLAY_TYPES.CARDS) {
+    dom.cardGrid?.classList.remove('is-hidden');
     renderCardsMain();
-  } else if (state.view === 'graph') {
+  } else if (state.view === DISPLAY_TYPES.GRAPH) {
     dom.graphWrap?.classList.remove('is-hidden');
     renderGraphMain(options);
   }
@@ -101,12 +144,10 @@ function renderCardsMain() {
   let nodes;
 
   if (state.semanticSearch.active) {
-    const nodesByLowerId = new Map(
-      [...index.nodeById.entries()].map(([nodeId, node]) => [nodeId.toLowerCase(), node])
-    );
     nodes = state.semanticSearch.results
+      // 结果只带名称（部分业务的名称恰好等于节点 id），故先按英文名、再按中文名反查
       .map((result) => {
-        const node = index.nodeById.get(result.name_en) || nodesByLowerId.get(result.name_en.toLowerCase());
+        const node = findNodeByKey(index, result.name_en) || findNodeByKey(index, result.name_zh);
         if (node) semanticScores.set(node.vid, Number(result.score));
         return node;
       })
@@ -139,7 +180,7 @@ function bindSemanticSearch() {
 async function handleSemanticSearch(event) {
   event.preventDefault();
   const query = dom.semanticSearch?.value.trim() || '';
-  if (!query || !state.dataSource || state.displayType !== 'cards') return;
+  if (!query || !state.dataSource || state.displayType !== DISPLAY_TYPES.CARDS) return;
 
   state.semanticSearch = {
     businessName: state.dataSource,
@@ -219,23 +260,23 @@ function renderGraphMain(options) {
 function renderDetailRoute() {
   dom.emptyPage?.classList.add('is-hidden');
   dom.mainHeader?.classList.add('is-hidden');
-  dom.grid?.classList.add('is-hidden');
+  dom.cardGrid?.classList.add('is-hidden');
   dom.graphWrap?.classList.add('is-hidden');
   setGraphActive(false);
 
-  showDetail(currentRoute.characterId, {
+  showDetail(currentRoute.nodeId, {
     index: getDataIndex(),
-    sourceView: state.detail.sourceView || state.displayType || 'cards',
+    sourceView: state.detail.sourceView || state.displayType || DETAIL_SOURCE_VIEWS.CARDS,
     onReady: () => {}
   });
 }
 
 function updateStats(visibleNodes) {
   const allNodes = state.data.nodes || [];
-  dom.total.textContent = allNodes.length;
-  dom.visible.textContent = visibleNodes.length;
-  dom.edges.textContent = state.data.edges?.length || 0;
-  dom.status.textContent = allNodes.length
+  dom.totalCount.textContent = allNodes.length;
+  dom.visibleCount.textContent = visibleNodes.length;
+  dom.edgeCount.textContent = state.data.edges?.length || 0;
+  dom.statusText.textContent = allNodes.length
     ? formatText(DATA_TEXT.loadedStatus, { nodes: allNodes.length, edges: state.data.edges?.length || 0 })
     : DATA_TEXT.emptyHint;
 }

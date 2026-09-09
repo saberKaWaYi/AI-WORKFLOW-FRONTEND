@@ -1,8 +1,9 @@
 import { api } from '../../core/api.js';
+import { DISPLAY_TYPES, LANGUAGES } from '../../core/constants.js';
 import { saveDataState, state } from '../../core/state.js';
 import { escapeHtml } from '../../core/utils.js';
 import { normalizeData, rebuildIndexes, createIndex } from './network-index.js';
-import { compareNodes, getName } from './character-utils.js';
+import { compareNodes, getName } from './node-fields.js';
 
 let dom = {};
 let index = createIndex();
@@ -109,13 +110,13 @@ function populateLanguageOptions() {
 
   if (has_chinese) {
     const option = document.createElement('option');
-    option.value = 'zh';
+    option.value = LANGUAGES.ZH;
     option.textContent = '中文';
     dom.dataLanguage.appendChild(option);
   }
   if (has_english) {
     const option = document.createElement('option');
-    option.value = 'en';
+    option.value = LANGUAGES.EN;
     option.textContent = 'English';
     dom.dataLanguage.appendChild(option);
   }
@@ -161,8 +162,8 @@ function finishDisplaySetup() {
 
 function syncDisplayFilterControls() {
   const ready = Boolean(state.dataSource && state.dataLanguage && state.displayType);
-  dom.graphFilterSection?.classList.toggle('is-hidden', !ready || state.displayType !== 'graph');
-  dom.cardsFilterSection?.classList.toggle('is-hidden', !ready || state.displayType !== 'cards');
+  dom.graphFilterSection?.classList.toggle('is-hidden', !ready || state.displayType !== DISPLAY_TYPES.GRAPH);
+  dom.cardsFilterSection?.classList.toggle('is-hidden', !ready || state.displayType !== DISPLAY_TYPES.CARDS);
 }
 
 function rebuildNodeSelects() {

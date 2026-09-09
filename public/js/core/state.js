@@ -1,3 +1,5 @@
+import { STORAGE_KEYS } from './constants.js';
+
 export const state = {
   user: null,
   page: 'data',
@@ -20,7 +22,7 @@ export const state = {
   detail: {
     loading: false,
     data: null,
-    characterId: '',
+    nodeId: '',
     sourceView: ''
   },
   semanticSearch: {
@@ -50,10 +52,10 @@ export const DATA_TEXT = {
   back: '返回'
 };
 
-const STORAGE_KEY = 'ai-workflow-data-state';
+
 
 export function saveDataState() {
-  sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+  sessionStorage.setItem(STORAGE_KEYS.DATA_STATE, JSON.stringify({
     dataSource: state.dataSource,
     dataLanguage: state.dataLanguage,
     displayType: state.displayType,
@@ -63,7 +65,7 @@ export function saveDataState() {
 }
 
 export function restoreDataState() {
-  const raw = sessionStorage.getItem(STORAGE_KEY);
+  const raw = sessionStorage.getItem(STORAGE_KEYS.DATA_STATE);
   if (!raw) return;
   try {
     const saved = JSON.parse(raw);
@@ -75,6 +77,6 @@ export function restoreDataState() {
       state.view = saved.view || saved.displayType;
     }
   } catch {
-    sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(STORAGE_KEYS.DATA_STATE);
   }
 }
