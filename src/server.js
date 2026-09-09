@@ -40,8 +40,12 @@ app.use(express.static(path.join(path.dirname(fileURLToPath(import.meta.url)), "
 
 async function proxy(url, res, timeoutMs = collectorTimeoutMs) {
   try {
+    const headers = { Accept: "application/json" };
+    // P1：向后端透传 API Key（调用方需配置 COLLECTOR_API_KEY 环境变量）
+    const apiKey = process.env.COLLECTOR_API_KEY;
+    if (apiKey) headers["X-API-Key"] = apiKey;
     const response = await fetch(url, {
-      headers: { Accept: "application/json" },
+      headers,
       signal: AbortSignal.timeout(timeoutMs)
     });
     const body = Buffer.from(await response.arrayBuffer());
@@ -55,8 +59,18 @@ async function proxy(url, res, timeoutMs = collectorTimeoutMs) {
   }
 }
 
+// P1 访问控制：数据接口必须已登录（type === "user"），游客/未登录直接 401。
+// 修复此前"登录系统形同虚设"的漏洞——数据代理注册在登录校验之前、且不校验 session。
+async function requireUser(req, res, next) {
+  const session = await sessionManager.readSession(req);
+  if (!session || session.type !== "user") {
+    return res.status(401).json({ message: "请先登录后再访问数据" });
+  }
+  next();
+}
+
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
-app.get("/api/businesses", (_req, res) => proxy(`${collectorApi}/businesses`, res));
+app.get("/api/businesses", requireUser, (_req, res) => proxy(`${collectorApi}/businesses`, res));
 app.get("/api/network/:business", (req, res) => proxy(`${collectorApi}/network/${encodeURIComponent(req.params.business)}`, res));
 app.get("/api/nodes", (req, res) => {
   const { business_name, name } = req.query;
