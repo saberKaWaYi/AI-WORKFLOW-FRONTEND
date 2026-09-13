@@ -63,6 +63,33 @@ export const BUSINESS_PROFILES = {
       { field: 'additional_sections', title: '补充章节', type: 'titled-list' },
       { field: 'related_scps', title: '正文关联项目', type: 'scp-links' }
     ]
+  },
+  pcr: {
+    label: 'PCR 角色',
+    relatedTitle: '相关角色',
+    noRelated: '暂无相关角色',
+    // pcr 字段均为 {字段_zh} 扁平本地化块，pickLocalized 可直接消费
+    metaFields: [
+      ['race', '种族'],
+      ['guild', '公会'],
+      ['element', '属性'],
+      ['position', '定位'],
+      ['attack_type', '攻击类型'],
+      ['base_character', '基准角色']
+    ],
+    heroSubFields: ['full_name'],
+    // pcr 角色头像在 avatars[{url}] 数组里（无 *_en，日文当中文）
+    heroImage: { source: 'avatars' },
+    sectionNav: true,
+    sections: [
+      { field: 'introduction', title: '介绍', type: 'text' },
+      { field: 'equipment', title: '装备', type: 'auto' },
+      { field: 'skills', title: '技能', type: 'pcr-skills' },
+      { field: 'bonds', title: '羁绊', type: 'pcr-bonds' },
+      { field: 'other_voices', title: '语音', type: 'pcr-voices' },
+      { field: 'stories', title: '角色故事', type: 'pcr-chapters' },
+      { field: 'story_lines', title: '剧情台词', type: 'pcr-story-lines' }
+    ]
   }
 };
 

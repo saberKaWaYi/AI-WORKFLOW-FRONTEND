@@ -2,7 +2,7 @@ import { api } from '../core/api.js';
 import { DETAIL_SOURCE_VIEWS, DISPLAY_TYPES, LANGUAGES } from '../core/constants.js';
 import { DATA_TEXT, state } from '../core/state.js';
 import { escapeHtml } from '../core/utils.js';
-import { navigateToDetail } from '../core/router.js';
+import { navigateToDetail, navigateToStory } from '../core/router.js';
 import {
   edgeEndpoint,
   getName,
@@ -42,14 +42,24 @@ function onClick(event) {
     event.preventDefault();
     event.stopPropagation();
     navigateToDetail(related.dataset.relatedId, state.detail.sourceView || DETAIL_SOURCE_VIEWS.CARDS);
+    return;
   }
 }
 
 function onChange(event) {
-  const select = event.target.closest('[data-voice-lang-select]');
-  if (!select) return;
-  setVoiceLanguage(select.value);
-  if (state.detail.nodeId) renderDetail(state.detail.nodeId);
+  const voiceSelect = event.target.closest('[data-voice-lang-select]');
+  if (voiceSelect) {
+    setVoiceLanguage(voiceSelect.value);
+    if (state.detail.nodeId) renderDetail(state.detail.nodeId);
+    return;
+  }
+  const sectionSelect = event.target.closest('[data-section-select]');
+  if (sectionSelect) {
+    const value = sectionSelect.value;
+    container.querySelectorAll('.detail-block').forEach((block) => {
+      block.hidden = !(value === '__all__' || block.dataset.section === value);
+    });
+  }
 }
 
 export async function showDetail(nodeId, { index, sourceView = DETAIL_SOURCE_VIEWS.CARDS, onReady }) {
@@ -117,7 +127,7 @@ function renderDetail(nodeId) {
   const related = getRelatedNodes(detailIndex || { relatedById: new Map() }, nodeId);
 
   container.innerHTML = `
-    <div class="detail-page">
+    <div class="detail-page" data-business="${escapeHtml(state.dataSource)}">
       <header class="detail-header">
         <button class="ghost-btn detail-back" type="button" data-detail-back>${escapeHtml(DATA_TEXT.back)}</button>
         <p class="detail-breadcrumb">${escapeHtml(state.dataSource)} / ${escapeHtml(labelSource(state.detail.sourceView))} / ${escapeHtml(namePrimary)}</p>
@@ -134,11 +144,16 @@ function renderDetail(nodeId) {
 
       <div class="detail-body">
         ${renderMetaSection(profile, data, lang)}
-        ${profile.sections.map((section) => renderSection(section, data, lang)).join('')}
+        ${renderSections(profile, data, lang)}
         ${renderRelated(related, lang, profile)}
+        ${state.dataSource === 'pcr' ? '<section class="detail-section" data-story-anchor><h2>相关剧情</h2><div class="detail-muted">加载中…</div></section>' : ''}
       </div>
     </div>
   `;
+
+  if (state.dataSource === 'pcr') {
+    loadRelatedStories(container, data, lang);
+  }
 }
 
 function pickHeroImage(profile, data, node, lang) {
@@ -149,12 +164,35 @@ function pickHeroImage(profile, data, node, lang) {
   if (config?.source === 'localized' && config.field) {
     return upgradeImageUrl(pickLocalized(data, config.field, lang)) || node?.properties?.photo || '';
   }
+  if (config?.source === 'avatars') {
+    const url = data?.avatars?.[0]?.url || node?.properties?.photo || '';
+    return upgradeImageUrl(url);
+  }
   return upgradeImageUrl(node?.properties?.photo || '');
 }
 
 function renderLine(text, className = '') {
   if (!text) return '';
   return `<p class="${className}">${escapeHtml(text)}</p>`;
+}
+
+function renderSections(profile, data, lang) {
+  if (!profile?.sections?.length) return '';
+  const blocks = profile.sections
+    .map((section) => {
+      const html = renderSection(section, data, lang);
+      if (!html) return '';
+      return `<div class="detail-block" data-section="${escapeHtml(section.title)}">${html}</div>`;
+    })
+    .filter(Boolean);
+  if (!blocks.length) return '';
+  const nav = profile.sectionNav
+    ? `<div class="detail-section-nav"><label class="detail-section-label">查看：</label><select class="detail-section-select" data-section-select>
+        <option value="__all__">全部</option>
+        ${profile.sections.map((s) => `<option value="${escapeHtml(s.title)}">${escapeHtml(s.title)}</option>`).join('')}
+      </select></div>`
+    : '';
+  return `${nav}${blocks.join('')}`;
 }
 
 function renderRelated(related, lang, profile) {
@@ -206,4 +244,40 @@ function renderRelatedRelation(edge, lang, fallback) {
 
 function labelSource(sourceView) {
   return sourceView === DISPLAY_TYPES.GRAPH ? '拓扑展示' : '列表展示';
+}
+
+/**
+ * pcr 角色详情的「相关剧情」入口：按角色中文名关联 pcr.stories 表。
+ * 后端接口尚未提供时优雅降级为提示，不影响角色详情本身渲染。
+ */
+async function loadRelatedStories(container, data, lang) {
+  const anchor = container.querySelector('[data-story-anchor]');
+  if (!anchor) return;
+  const name = pickLocalized(data, 'name', lang);
+  if (!name) {
+    anchor.innerHTML = '<p class="detail-muted">暂无剧情关联</p>';
+    return;
+  }
+  try {
+    const res = await api(`/api/stories/${encodeURIComponent(state.dataSource)}?character=${encodeURIComponent(name)}`);
+    const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+    if (!list.length) {
+      anchor.innerHTML = '<p class="detail-muted">该角色暂无关联剧情。</p>';
+      return;
+    }
+    anchor.innerHTML = `
+      <h2>相关剧情</h2>
+      <div class="detail-related-grid">
+        ${list.map((s) => {
+          const key = escapeHtml(s.key || '');
+          const title = escapeHtml(s?.title?.title_zh || s?.title || key);
+          return `<button class="detail-related-card" type="button" data-story-key="${key}"><div><strong>${title}</strong></div></button>`;
+        }).join('')}
+      </div>`;
+    anchor.querySelectorAll('[data-story-key]').forEach((el) => {
+      el.addEventListener('click', () => navigateToStory(el.dataset.storyKey));
+    });
+  } catch (e) {
+    anchor.innerHTML = '<p class="detail-muted">剧情数据接口尚未接入。</p>';
+  }
 }

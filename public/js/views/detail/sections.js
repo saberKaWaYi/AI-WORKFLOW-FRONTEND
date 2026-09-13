@@ -48,7 +48,7 @@ export function renderMetaSection(profile, data, lang) {
     .join('');
   if (!items) return '';
   return `
-    <section class="detail-section">
+    <section class="detail-section" data-section="基本属性">
       <h2>基本属性</h2>
       <div class="detail-meta-grid">${items}</div>
     </section>
@@ -80,6 +80,16 @@ export function renderSection(section, data, lang) {
       const voiceList = Array.isArray(data[field]) ? data[field] : [];
       return renderVoice(voiceList, ensureVoiceLanguage(voiceList));
     }
+    case 'pcr-skills':
+      return renderPcrSkills(data[field]);
+    case 'pcr-bonds':
+      return renderPcrBonds(data[field]);
+    case 'pcr-voices':
+      return renderPcrVoices(data[field]);
+    case 'pcr-chapters':
+      return renderPcrChapters(data[field]);
+    case 'pcr-story-lines':
+      return renderPcrStoryLines(data[field]);
     default:
       return renderAutoSection(title, raw);
   }
@@ -106,7 +116,7 @@ export function renderAutoSection(title, value) {
 export function renderTextSection(title, text) {
   if (!text) return '';
   return `
-    <section class="detail-section">
+    <section class="detail-section" data-section="${escapeHtml(title)}">
       <h2>${escapeHtml(title)}</h2>
       <div class="detail-text">${escapeHtml(text)}</div>
     </section>
@@ -117,7 +127,7 @@ export function renderListSection(title, items) {
   const flat = flattenItems(items);
   if (!flat.length) return '';
   return `
-    <section class="detail-section">
+    <section class="detail-section" data-section="${escapeHtml(title)}">
       <h2>${escapeHtml(title)}</h2>
       <div class="detail-list">
         ${flat.map((item) => `<p class="detail-list-item">${escapeHtml(item)}</p>`).join('')}
@@ -147,7 +157,7 @@ export function renderTitledListSection(title, items) {
     .join('');
   if (!cards) return '';
   return `
-    <section class="detail-section">
+    <section class="detail-section" data-section="${escapeHtml(title)}">
       <h2>${escapeHtml(title)}</h2>
       <div class="detail-entry-list">${cards}</div>
     </section>
@@ -164,7 +174,7 @@ export function renderObjectSection(title, entries, labels) {
     }));
   if (!items.length) return '';
   return `
-    <section class="detail-section">
+    <section class="detail-section" data-section="${escapeHtml(title)}">
       <h2>${escapeHtml(title)}</h2>
       <div class="detail-kv-list">
         ${items.map(({ key, value }) => `
@@ -182,7 +192,7 @@ export function renderKeyValueSection(title, items) {
   const entries = flattenKeyValueItems(items);
   if (!entries.length) return '';
   return `
-    <section class="detail-section">
+    <section class="detail-section" data-section="${escapeHtml(title)}">
       <h2>${escapeHtml(title)}</h2>
       <div class="detail-kv-list">
         ${entries.map(({ key, value }) => `
@@ -216,7 +226,7 @@ export function renderScpLinksSection(title, items) {
     .join('');
   if (!cards) return '';
   return `
-    <section class="detail-section">
+    <section class="detail-section" data-section="${escapeHtml(title)}">
       <h2>${escapeHtml(title)}</h2>
       <div class="detail-related-grid">${cards}</div>
     </section>
@@ -241,13 +251,13 @@ export function renderImageSection(title, images) {
     })
     .filter(Boolean)
     .join('');
-  return cards ? `<section class="detail-section"><h2>${escapeHtml(title)}</h2><div class="detail-image-grid">${cards}</div></section>` : '';
+  return cards ? `<section class="detail-section" data-section="${escapeHtml(title)}"><h2>${escapeHtml(title)}</h2><div class="detail-image-grid">${cards}</div></section>` : '';
 }
 
 export function renderGifs(gifs) {
   if (!Array.isArray(gifs) || !gifs.length) return '';
   return `
-    <section class="detail-section">
+    <section class="detail-section" data-section="动作">
       <h2>动作</h2>
       <div class="detail-image-grid">
         ${gifs.map((item) => {
@@ -286,7 +296,7 @@ export function renderVoice(voice, lang) {
     .join('');
 
   return `
-    <section class="detail-section">
+    <section class="detail-section" data-section="语音">
       <h2>语音</h2>
       <div class="detail-voice-shell">
         <div class="detail-voice-toolbar">
@@ -365,4 +375,114 @@ function pickStoryList(data, lang) {
 function excerpt(text, maxLength) {
   const value = String(text || '');
   return value.length > maxLength ? `${value.slice(0, maxLength)}…` : value;
+}
+
+/* ---------- pcr 专用渲染器（字段结构为 pcr 特有，通用 type 接不住）---------- */
+
+function renderPcrSkills(skills) {
+  if (!Array.isArray(skills) || !skills.length) return '';
+  const cards = skills.map((s, index) => {
+    if (!s || typeof s !== 'object') return '';
+    const name = [s.name_zh, s.name_extra].filter(Boolean).join(' ');
+    const desc = s.description || '';
+    const upName = s.upgraded_name_zh;
+    const upDesc = s.upgraded_description;
+    return `
+      <article class="detail-entry pcr-skill-card">
+        ${name ? `<div class="detail-entry-head"><span class="pcr-skill-icon">${index + 1}</span><span class="detail-entry-title">${escapeHtml(name)}</span>${s.slot != null ? `<span class="detail-entry-badge pcr-skill-slot">${escapeHtml(String(s.slot))}</span>` : ''}</div>` : ''}
+        ${desc ? `<div class="detail-entry-body">${escapeHtml(desc)}</div>` : ''}
+        ${(upName || upDesc) ? `<div class="detail-entry-body detail-entry-upgraded"><strong>升级后</strong>${escapeHtml([upName, upDesc].filter(Boolean).join(' — '))}</div>` : ''}
+      </article>`;
+  }).filter(Boolean).join('');
+  if (!cards) return '';
+  return `<section class="detail-section" data-section="技能"><h2>技能</h2><div class="detail-entry-list">${cards}</div></section>`;
+}
+
+function renderPcrBonds(bonds) {
+  if (!Array.isArray(bonds) || !bonds.length) return '';
+  const cards = bonds.map((b) => {
+    if (!b || typeof b !== 'object') return '';
+    const level = b.level != null ? `Lv.${b.level}` : '';
+    const effect = b.effect || '';
+    return `
+      <article class="detail-entry pcr-bond-card">
+        ${level ? `<div class="detail-entry-head"><span class="pcr-bond-icon">♥</span><span class="detail-entry-title pcr-bond-level">${escapeHtml(level)}</span></div>` : ''}
+        ${effect ? `<div class="detail-entry-body">${escapeHtml(effect)}</div>` : ''}
+      </article>`;
+  }).filter(Boolean).join('');
+  if (!cards) return '';
+  return `<section class="detail-section" data-section="羁绊"><h2>羁绊</h2><div class="detail-entry-list">${cards}</div></section>`;
+}
+
+function renderPcrVoices(otherVoices) {
+  if (!Array.isArray(otherVoices) || !otherVoices.length) return '';
+  const cards = otherVoices.map((item) => {
+    if (!item || typeof item !== 'object') return '';
+    const scene = item.scene || '';
+    const urls = Array.isArray(item.voices) ? item.voices.filter((u) => typeof u === 'string' && u) : [];
+    if (!urls.length) return '';
+    const audios = urls.map((u, i) => `
+      <div class="pcr-voice-audio">
+        <span class="pcr-voice-index">${i + 1}</span>
+        <audio controls preload="none" src="${escapeHtml(u)}"></audio>
+      </div>`).join('');
+    return `
+      <article class="detail-entry pcr-voice-card">
+        ${scene ? `<div class="detail-entry-head"><span class="pcr-voice-scene">${escapeHtml(scene)}</span></div>` : ''}
+        <div class="pcr-voice-stack">${audios}</div>
+      </article>`;
+  }).filter(Boolean).join('');
+  if (!cards) return '';
+  return `<section class="detail-section" data-section="语音"><h2>语音</h2><div class="detail-entry-list pcr-voice-list">${cards}</div></section>`;
+}
+
+function renderPcrChapters(stories) {
+  if (!stories || typeof stories !== 'object') return '';
+  const chapters = Array.isArray(stories.chapters) ? stories.chapters : [];
+  if (!chapters.length) return '';
+  const cards = chapters.map((c, index) => {
+    if (!c || typeof c !== 'object') return '';
+    const title = c.title || '';
+    const lines = Array.isArray(c.lines) ? c.lines : [];
+    const lineHtml = lines.map((ln) => {
+      if (!ln || typeof ln !== 'object') return '';
+      const speaker = ln.speaker ? escapeHtml(ln.speaker) : '';
+      const text = ln.text ? escapeHtml(ln.text) : '';
+      return `<div class="detail-dialogue-line">${speaker ? `<div class="story-speaker">${speaker}</div>` : ''}<p class="story-text">${text}</p></div>`;
+    }).filter(Boolean).join('');
+    const body = lineHtml || '<p class="detail-muted">（暂无台词文本）</p>';
+    return `
+      <article class="detail-entry pcr-chapter-card">
+        ${title ? `<div class="detail-entry-head"><span class="pcr-chapter-index">${index + 1}</span><span class="detail-entry-title">${escapeHtml(title)}</span></div>` : ''}
+        <div class="detail-dialogue">${body}</div>
+      </article>`;
+  }).filter(Boolean).join('');
+  if (!cards) return '';
+  const url = typeof stories.url === 'string' && stories.url
+    ? `<p class="detail-muted pcr-story-link"><a href="${escapeHtml(stories.url)}" target="_blank" rel="noopener">查看完整故事 →</a></p>`
+    : '';
+  return `<section class="detail-section" data-section="角色故事"><h2>角色故事</h2><div class="detail-story-scroll"><div class="detail-entry-list">${cards}</div></div>${url}</section>`;
+}
+
+function renderPcrStoryLines(storyLines) {
+  if (!Array.isArray(storyLines) || !storyLines.length) return '';
+  const cards = storyLines.map((item) => {
+    if (!item || typeof item !== 'object') return '';
+    const group = item.group || '';
+    const lines = Array.isArray(item.lines) ? item.lines : [];
+    const lineHtml = lines.map((ln, i) => {
+      if (!ln || typeof ln !== 'object') return '';
+      const text = ln.text || '';
+      const voice = typeof ln.voice === 'string' && ln.voice ? `<div class="pcr-story-voice"><audio controls preload="none" src="${escapeHtml(ln.voice)}"></audio></div>` : '';
+      const note = ln.note ? `<small class="detail-muted">${escapeHtml(ln.note)}</small>` : '';
+      return `<div class="detail-dialogue-line">${text ? `<p class="story-text"><span class="pcr-line-index">${i + 1}</span>${escapeHtml(text)}</p>` : ''}${voice}${note}</div>`;
+    }).filter(Boolean).join('');
+    return `
+      <article class="detail-entry pcr-story-group">
+        ${group ? `<div class="detail-entry-head"><span class="pcr-group-icon">❖</span><span class="detail-entry-title">${escapeHtml(group)}</span></div>` : ''}
+        <div class="detail-dialogue">${lineHtml}</div>
+      </article>`;
+  }).filter(Boolean).join('');
+  if (!cards) return '';
+  return `<section class="detail-section" data-section="剧情台词"><h2>剧情台词</h2><div class="detail-entry-list">${cards}</div></section>`;
 }

@@ -177,7 +177,14 @@ function renderNodeSelect(select, selectedValue, nodes) {
   if (!select) return;
   select.innerHTML = [
     `<option value="">不限</option>`,
-    ...nodes.map((node) => `<option value="${escapeHtml(node.vid)}">${escapeHtml(getName(node, state.dataLanguage))} (${escapeHtml(node.vid)})</option>`)
+    ...nodes.map((node) => {
+      const primaryName = escapeHtml(getName(node, state.dataLanguage));
+      const vid = escapeHtml(node.vid || '');
+      const label = primaryName.toLowerCase() === vid.toLowerCase()
+        ? primaryName
+        : `${primaryName} (${vid})`;
+      return `<option value="${vid}">${label}</option>`;
+    })
   ].join('');
   select.value = selectedValue;
 }

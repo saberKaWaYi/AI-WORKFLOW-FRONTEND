@@ -2,13 +2,14 @@ import { DATA_TEXT, state } from '../../core/state.js';
 import { api } from '../../core/api.js';
 import { DETAIL_SOURCE_VIEWS, DISPLAY_TYPES, SYSTEM_IDS } from '../../core/constants.js';
 import { formatText } from '../../core/utils.js';
-import { navigateToDataMain, navigateToDetail } from '../../core/router.js';
+import { navigateToDataMain, navigateToDetail, ROUTE_PAGES } from '../../core/router.js';
 import { compareNodes } from './node-fields.js';
 import { getDataIndex, initConfigPanel, loadBusinesses, restoreConfigFromState, syncFilterUiValues } from './config-panel.js';
 import { findNodeByKey } from './network-index.js';
 import { initListView, renderList, matchesQuery, closeListPanel } from '../../views/list-view.js';
 import { initGraphView, renderGraph, setGraphActive, refreshGraphLayout } from '../../views/graph-view.js';
 import { initDetailView, showDetail, hideDetail } from '../../views/detail-view.js';
+import { renderStoriesPage, renderStoryDetail } from '../../views/story-view.js';
 
 let dom = {};
 let currentRoute = { system: SYSTEM_IDS.DATA, page: 'main' };
@@ -95,7 +96,39 @@ export async function bootDataApp() {
 
 export function renderDataRoute(route) {
   currentRoute = route;
+  if (route.page === ROUTE_PAGES.STORIES) {
+    renderStoriesRoute();
+    return;
+  }
+  if (route.page === ROUTE_PAGES.STORY) {
+    renderStoryRoute(route.storyKey);
+    return;
+  }
   renderDataPage();
+}
+
+/** 故事库总览页（#/data/stories）：浏览 pcr.stories 全部剧情，按主线/活动分组。 */
+function renderStoriesRoute() {
+  hideDetail();
+  setGraphActive(false);
+  closeListPanel();
+  dom.emptyPage?.classList.add('is-hidden');
+  dom.mainHeader?.classList.add('is-hidden');
+  dom.cardGrid?.classList.add('is-hidden');
+  dom.graphWrap?.classList.add('is-hidden');
+  renderStoriesPage(dom.detailView, state.dataSource);
+}
+
+/** 单条剧情详情页（#/data/story/<key>）。 */
+function renderStoryRoute(storyKey) {
+  hideDetail();
+  setGraphActive(false);
+  closeListPanel();
+  dom.emptyPage?.classList.add('is-hidden');
+  dom.mainHeader?.classList.add('is-hidden');
+  dom.cardGrid?.classList.add('is-hidden');
+  dom.graphWrap?.classList.add('is-hidden');
+  renderStoryDetail(dom.detailView, state.dataSource, storyKey);
 }
 
 function renderDataPage(options = {}) {
