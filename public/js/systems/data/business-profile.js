@@ -17,7 +17,8 @@ const GENSHIN_META_FIELDS = [
   ['bond_prop', '羁绊']
 ];
 
-const SCP_CHARACTERISTIC_LABELS = {
+// 特征子字段 -> 中文标签。scp 与后室的特征字段同名，共用一份
+const CHARACTERISTIC_LABELS = {
   abilities: '能力',
   appearance: '外观',
   behavior: '行为',
@@ -72,7 +73,7 @@ export const BUSINESS_PROFILES = {
       { field: 'summary', title: '概述', type: 'text' },
       { field: 'special_containment_procedures', title: '特殊收容措施', type: 'text' },
       { field: 'description', title: '描述', type: 'text' },
-      { field: 'characteristics', title: '特征', type: 'kv-object', labels: SCP_CHARACTERISTIC_LABELS },
+      { field: 'characteristics', title: '特征', type: 'kv-object', labels: CHARACTERISTIC_LABELS },
       { field: 'incidents', title: '事故记录', type: 'titled-list' },
       { field: 'experiment_logs', title: '实验记录', type: 'titled-list' },
       { field: 'additional_sections', title: '补充章节', type: 'titled-list' }
@@ -138,6 +139,36 @@ export const BUSINESS_PROFILES = {
     storyTitle: '相关剧情',
     storyFields: PCR_STORY_FIELDS,
     storyCategoryLabels: PCR_STORY_CATEGORY_LABELS
+  },
+  backrooms: {
+    label: '后室条目',
+    relatedTitle: '相关条目',
+    noRelated: '暂无相关条目',
+    metaFields: [
+      ['category', '类别'],
+      ['classification', '安全等级']
+    ],
+    heroSubFields: ['entry_id'],
+    // 后室是纯文本资料站，无图源；详情页不显示头图
+    heroImage: null,
+    sectionNav: true,
+    // 全部走通用 type，无需专用渲染器。
+    // 刻意不配 related_entries：关联从 Nebula 图实时算（与 scp 一致），
+    // 配了就会和「相关条目」区块重复渲染同一批数据。
+    sections: [
+      { field: 'summary', title: '概述', type: 'text' },
+      { field: 'description', title: '描述', type: 'text' },
+      { field: 'characteristics', title: '特征', type: 'kv-object', labels: CHARACTERISTIC_LABELS },
+      { field: 'entrances', title: '入口', type: 'text' },
+      { field: 'exits', title: '出口', type: 'text' },
+      { field: 'hazards', title: '危险', type: 'text' },
+      { field: 'usage', title: '用途', type: 'text' },
+      { field: 'acquisition', title: '获取方式', type: 'text' },
+      { field: 'habitat', title: '栖息地', type: 'text' },
+      { field: 'bases_outposts_communities', title: '基地前哨与社群', type: 'text' },
+      { field: 'additional_sections', title: '补充章节', type: 'titled-list' },
+      { field: 'attributes', title: '属性', type: 'auto' }
+    ]
   }
 };
 
