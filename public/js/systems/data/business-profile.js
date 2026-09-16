@@ -28,6 +28,21 @@ const SCP_META_FIELDS = [
   ['object_class', '项目分级']
 ];
 
+/** 剧情文档（独立 mongo 表）的字段契约：键为渲染角色，值为该业务的字段名。 */
+export const DEFAULT_STORY_FIELDS = {
+  title: 'title',
+  chapter: 'chapter',
+  episode: 'episode_no',
+  summary: 'summary',
+  category: 'category',
+  characters: 'characters',
+  lines: 'lines'
+};
+
+const PCR_STORY_FIELDS = { ...DEFAULT_STORY_FIELDS };
+
+const PCR_STORY_CATEGORY_LABELS = { 主线: '主线剧情', 活动: '活动剧情' };
+
 export const BUSINESS_PROFILES = {
   genshin: {
     label: '原神角色',
@@ -60,15 +75,14 @@ export const BUSINESS_PROFILES = {
       { field: 'characteristics', title: '特征', type: 'kv-object', labels: SCP_CHARACTERISTIC_LABELS },
       { field: 'incidents', title: '事故记录', type: 'titled-list' },
       { field: 'experiment_logs', title: '实验记录', type: 'titled-list' },
-      { field: 'additional_sections', title: '补充章节', type: 'titled-list' },
-      { field: 'related_scps', title: '正文关联项目', type: 'scp-links' }
+      { field: 'additional_sections', title: '补充章节', type: 'titled-list' }
     ]
   },
   pcr: {
     label: 'PCR 角色',
     relatedTitle: '相关角色',
     noRelated: '暂无相关角色',
-    // pcr 字段均为 {字段_zh} 扁平本地化块，pickLocalized 可直接消费
+    // 字段均为 {字段_zh} 扁平本地化块，pickLocalized 可直接消费
     metaFields: [
       ['race', '种族'],
       ['guild', '公会'],
@@ -78,18 +92,52 @@ export const BUSINESS_PROFILES = {
       ['base_character', '基准角色']
     ],
     heroSubFields: ['full_name'],
-    // pcr 角色头像在 avatars[{url}] 数组里（无 *_en，日文当中文）
+    // 头像在 avatars[{url}] 数组里（无 *_en，日文当中文）
     heroImage: { source: 'avatars' },
     sectionNav: true,
+    // 结构差异全部落在 map 里：渲染器只认 heading/body/badge 这类角色，不认业务字段名
     sections: [
       { field: 'introduction', title: '介绍', type: 'text' },
       { field: 'equipment', title: '装备', type: 'auto' },
-      { field: 'skills', title: '技能', type: 'pcr-skills' },
-      { field: 'bonds', title: '羁绊', type: 'pcr-bonds' },
-      { field: 'other_voices', title: '语音', type: 'pcr-voices' },
-      { field: 'stories', title: '角色故事', type: 'pcr-chapters' },
-      { field: 'story_lines', title: '剧情台词', type: 'pcr-story-lines' }
-    ]
+      {
+        field: 'skills',
+        title: '技能',
+        type: 'entry-list',
+        map: {
+          heading: ['name_zh', 'name_extra'],
+          badge: 'slot',
+          body: 'description',
+          extra: ['upgraded_name_zh', 'upgraded_description'],
+          extraLabel: '升级后',
+          ordinal: true,
+          variant: 'detail-entry-skill'
+        }
+      },
+      {
+        field: 'bonds',
+        title: '羁绊',
+        type: 'entry-list',
+        map: { icon: '♥', heading: 'level', headingPrefix: 'Lv.', body: 'effect', variant: 'detail-entry-bond' }
+      },
+      { field: 'other_voices', title: '语音', type: 'audio-list', map: { heading: 'scene', urls: 'voices' } },
+      {
+        field: 'stories',
+        title: '角色故事',
+        type: 'dialogue-list',
+        map: { heading: 'title', lines: 'lines', scroll: true, link: 'url', variant: 'detail-entry-chapter' }
+      },
+      {
+        field: 'story_lines',
+        title: '剧情台词',
+        type: 'dialogue-list',
+        map: { heading: 'group', lines: 'lines', lineIndex: true, icon: '❖', variant: 'detail-entry-group' }
+      }
+    ],
+    // 额外挂了一张独立的剧情 mongo 表，属数据层差异，用开关声明而非在视图里写死业务名
+    storyModule: true,
+    storyTitle: '相关剧情',
+    storyFields: PCR_STORY_FIELDS,
+    storyCategoryLabels: PCR_STORY_CATEGORY_LABELS
   }
 };
 
@@ -100,6 +148,9 @@ const FALLBACK_PROFILE = {
   metaFields: [],
   heroSubFields: [],
   heroImage: null,
+  storyModule: false,
+  storyFields: DEFAULT_STORY_FIELDS,
+  storyCategoryLabels: {},
   sections: []
 };
 
@@ -140,6 +191,20 @@ function buildFallbackProfile(data) {
 function isLocalizedBlock(value, field) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   return `${field}_zh` in value || `${field}_en` in value;
+}
+
+/**
+ * 剧情模块配置。业务未声明 storyModule 时返回 null，
+ * 视图据此决定是否渲染剧情入口，避免在通用文件里写死业务名。
+ */
+export function getStoryConfig(businessName) {
+  const profile = getBusinessProfile(businessName);
+  if (!profile?.storyModule) return null;
+  return {
+    title: profile.storyTitle || '相关剧情',
+    fields: { ...DEFAULT_STORY_FIELDS, ...(profile.storyFields || {}) },
+    categoryLabels: profile.storyCategoryLabels || {}
+  };
 }
 
 export function getHeroTexts(profile, data, lang) {

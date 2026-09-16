@@ -13,7 +13,7 @@ import {
   pickLocalized,
   upgradeImageUrl
 } from '../systems/data/node-fields.js';
-import { resolveProfile, getHeroTexts } from '../systems/data/business-profile.js';
+import { resolveProfile, getHeroTexts, getStoryConfig } from '../systems/data/business-profile.js';
 import { getRelatedNodes } from '../systems/data/network-index.js';
 import { renderMetaSection, renderSection, setVoiceLanguage } from './detail/sections.js';
 
@@ -125,6 +125,7 @@ function renderDetail(nodeId) {
   const portrait = pickHeroImage(profile, data, node, lang);
   const heroTexts = getHeroTexts(profile, data, lang);
   const related = getRelatedNodes(detailIndex || { relatedById: new Map() }, nodeId);
+  const storyConfig = getStoryConfig(state.dataSource);
 
   container.innerHTML = `
     <div class="detail-page" data-business="${escapeHtml(state.dataSource)}">
@@ -146,13 +147,13 @@ function renderDetail(nodeId) {
         ${renderMetaSection(profile, data, lang)}
         ${renderSections(profile, data, lang)}
         ${renderRelated(related, lang, profile)}
-        ${state.dataSource === 'pcr' ? '<section class="detail-section" data-story-anchor><h2>相关剧情</h2><div class="detail-muted">加载中…</div></section>' : ''}
+        ${storyConfig ? `<section class="detail-section" data-story-anchor><h2>${escapeHtml(storyConfig.title)}</h2><div class="detail-muted">加载中…</div></section>` : ''}
       </div>
     </div>
   `;
 
-  if (state.dataSource === 'pcr') {
-    loadRelatedStories(container, data, lang);
+  if (storyConfig) {
+    loadRelatedStories(container, data, lang, storyConfig);
   }
 }
 
@@ -247,10 +248,10 @@ function labelSource(sourceView) {
 }
 
 /**
- * pcr 角色详情的「相关剧情」入口：按角色中文名关联 pcr.stories 表。
+ * 剧情模块入口：按角色名关联该业务独立的剧情表（接口按业务泛化，非某业务专属）。
  * 后端接口尚未提供时优雅降级为提示，不影响角色详情本身渲染。
  */
-async function loadRelatedStories(container, data, lang) {
+async function loadRelatedStories(container, data, lang, storyConfig) {
   const anchor = container.querySelector('[data-story-anchor]');
   if (!anchor) return;
   const name = pickLocalized(data, 'name', lang);
@@ -266,11 +267,11 @@ async function loadRelatedStories(container, data, lang) {
       return;
     }
     anchor.innerHTML = `
-      <h2>相关剧情</h2>
+      <h2>${escapeHtml(storyConfig.title)}</h2>
       <div class="detail-related-grid">
         ${list.map((s) => {
           const key = escapeHtml(s.key || '');
-          const title = escapeHtml(s?.title?.title_zh || s?.title || key);
+          const title = escapeHtml(pickLocalized(s, storyConfig.fields.title, lang) || key);
           return `<button class="detail-related-card" type="button" data-story-key="${key}"><div><strong>${title}</strong></div></button>`;
         }).join('')}
       </div>`;

@@ -41,11 +41,11 @@ export function pickEdgeText(edge, lang) {
 }
 
 /**
- * 取关系文案并逐级降级：指定语言 -> 备用语言 -> 边 id。
+ * 取关系文案并逐级降级：指定语言 -> 备用语言。
  * 用于生成稳定的去重键，避免同一条关系因某语言缺失而被算作多条。
  */
 export function pickEdgeTextWithFallback(edge, lang, fallbackLang = LANGUAGES.EN) {
-  return pickEdgeText(edge, lang) || pickEdgeText(edge, fallbackLang) || edge?.id || '';
+  return pickEdgeText(edge, lang) || pickEdgeText(edge, fallbackLang) || '';
 }
 
 export function getRelationText(edge, lang) {

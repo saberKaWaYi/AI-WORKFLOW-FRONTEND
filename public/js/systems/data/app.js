@@ -107,7 +107,7 @@ export function renderDataRoute(route) {
   renderDataPage();
 }
 
-/** 故事库总览页（#/data/stories）：浏览 pcr.stories 全部剧情，按主线/活动分组。 */
+/** 剧情库总览页（#/data/stories）：浏览当前业务剧情表的全部剧情，按 category 分组。 */
 function renderStoriesRoute() {
   hideDetail();
   setGraphActive(false);

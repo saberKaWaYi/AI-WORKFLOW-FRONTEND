@@ -1,49 +1,51 @@
 /**
- * PCR 故事页：浏览 pcr.stories 这张独立的 mongo 表。
+ * 剧情库视图：浏览某业务独立的剧情 mongo 表。
  *
  * 入口有两处：
- *  - 直接从 #/data/stories 浏览全部剧情（按 category 分「主线 / 活动」）。
- *  - 从角色详情的「相关剧情」入口点进来（#/data/story/<key> 看单条）。
+ *  - 直接从 #/data/stories 浏览全部剧情（按 category 分组）。
+ *  - 从角色详情的剧情模块入口点进来（#/data/story/<key> 看单条）。
  *
- * 数据接口契约（后端待补，目前仅 pcr 提供 stories）：
+ * 数据接口契约（按业务泛化，业务需在 profile 里声明 storyModule）：
  *  - GET /api/stories/{business}            -> { data: [ story, ... ] }
  *  - GET /api/stories/{business}/{key}      -> { data: story }
  * 接口未接入时，本视图会显示清晰的「接口尚未接入」提示，不会崩溃。
  *
- * 故事文档字段（均为 {xxx_zh} 扁平本地化块）：
- *  key / url / category / title / chapter / episode_no / summary / characters[] / lines[{speaker,text}]
+ * 剧情文档的字段名由 profile.storyFields 声明（键为渲染角色，值为该业务的字段名），
+ * 值均为 {xxx_zh} 扁平本地化块，因此本文件不含任何业务名或业务字段名。
  */
 import { api } from '../core/api.js';
 import { escapeHtml } from '../core/utils.js';
 import { navigateToStory } from '../core/router.js';
+import { getStoryConfig } from '../systems/data/business-profile.js';
 
-const CATEGORY_LABELS = { '主线': '主线剧情', '活动': '活动剧情' };
-
-function categoryLabel(category) {
-  const value = typeof category === 'object' ? category?.category_zh : category;
-  return CATEGORY_LABELS[value] || value || '剧情';
+/** 从本地化块里取值；块本身是字符串时原样返回。 */
+function pickBlock(block, field) {
+  if (!block) return '';
+  if (typeof block === 'string') return block;
+  if (typeof block !== 'object') return '';
+  return block[`${field}_zh`] || block[`${field}_en`] || '';
 }
 
-function pickZh(block) {
-  if (!block || typeof block !== 'object') return '';
-  return block.category_zh || block.title_zh || block.chapter_zh || block.episode_no_zh || block.summary_zh || '';
+function categoryLabel(config, category) {
+  const value = pickBlock(category, config.fields.category);
+  return config.categoryLabels?.[value] || value || '剧情';
 }
 
-function groupByCategory(list) {
+function groupByCategory(list, config) {
   const groups = new Map();
   for (const item of list) {
-    const cat = pickZh(item.category) || '其他';
+    const cat = pickBlock(item?.[config.fields.category], config.fields.category) || '其他';
     if (!groups.has(cat)) groups.set(cat, []);
     groups.get(cat).push(item);
   }
   return groups;
 }
 
-function storyCard(story) {
+function storyCard(config, story) {
   const key = escapeHtml(story.key || '');
-  const title = escapeHtml(pickZh(story.title) || key);
-  const chapter = pickZh(story.chapter);
-  const characters = Array.isArray(story.characters) ? story.characters.length : 0;
+  const title = escapeHtml(pickBlock(story[config.fields.title], config.fields.title) || key);
+  const chapter = pickBlock(story[config.fields.chapter], config.fields.chapter);
+  const characters = Array.isArray(story[config.fields.characters]) ? story[config.fields.characters].length : 0;
   return `
     <button class="detail-related-card" type="button" data-story-key="${key}" aria-label="${title}">
       <div>
@@ -76,43 +78,51 @@ function bindStoryNavigation(container) {
   });
 }
 
+function skeleton(text = '正在加载剧情…') {
+  return `<div class="detail-page"><div class="detail-skeleton">${escapeHtml(text)}</div></div>`;
+}
+
+function notice(business, heading, message) {
+  return `
+    <div class="detail-page">
+      <header class="detail-header">
+        <button class="ghost-btn detail-back" type="button" data-story-back>← 返回</button>
+        <p class="detail-breadcrumb">${escapeHtml(business)} / 剧情库</p>
+      </header>
+      <div class="detail-section">
+        <h2>${escapeHtml(heading)}</h2>
+        <p class="detail-muted">${escapeHtml(message)}</p>
+      </div>
+    </div>`;
+}
+
 export async function renderStoriesPage(container, business) {
   container.classList.remove('is-hidden');
   bindStoryNavigation(container);
-  container.innerHTML = `<div class="detail-page"><div class="detail-skeleton">正在加载剧情列表…</div></div>`;
+
+  const config = getStoryConfig(business);
+  if (!config) {
+    container.innerHTML = notice(business, '剧情库', '该业务未启用剧情模块。');
+    return;
+  }
+
+  container.innerHTML = skeleton('正在加载剧情列表…');
 
   let list = [];
   try {
     const res = await api(`/api/stories/${encodeURIComponent(business)}`);
-    list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+    list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
   } catch (e) {
-    container.innerHTML = `
-      <div class="detail-page">
-        <header class="detail-header">
-          <button class="ghost-btn detail-back" type="button" data-story-back>← 返回</button>
-          <p class="detail-breadcrumb">${escapeHtml(business)} / 剧情库</p>
-        </header>
-        <div class="detail-section">
-          <h2>剧情库</h2>
-          <p class="detail-muted">剧情数据接口尚未接入（后端 GET /api/stories/${escapeHtml(business)} 暂不可用）。</p>
-        </div>
-      </div>`;
+    container.innerHTML = notice(business, '剧情库', `剧情数据接口尚未接入（后端 GET /api/stories/${business} 暂不可用）。`);
     return;
   }
 
   if (!list.length) {
-    container.innerHTML = `
-      <div class="detail-page">
-        <header class="detail-header">
-          <button class="ghost-btn detail-back" type="button" data-story-back>← 返回</button>
-          <p class="detail-breadcrumb">${escapeHtml(business)} / 剧情库</p>
-        </header>
-        <div class="detail-section"><h2>剧情库</h2><p class="detail-muted">该业务暂无剧情数据。</p></div>
-      </div>`;
+    container.innerHTML = notice(business, '剧情库', '该业务暂无剧情数据。');
     return;
   }
 
-  const groups = groupByCategory(list);
+  const groups = groupByCategory(list, config);
   container.innerHTML = `
     <div class="detail-page">
       <header class="detail-header">
@@ -121,9 +131,9 @@ export async function renderStoriesPage(container, business) {
       </header>
       ${[...groups.entries()].map(([cat, items]) => `
         <section class="detail-section">
-          <h2>${escapeHtml(categoryLabel(cat))}（${items.length}）</h2>
+          <h2>${escapeHtml(categoryLabel(config, cat))}（${items.length}）</h2>
           <div class="detail-related-grid">
-            ${items.map((s) => storyCard(s)).join('')}
+            ${items.map((s) => storyCard(config, s)).join('')}
           </div>
         </section>
       `).join('')}
@@ -133,39 +143,35 @@ export async function renderStoriesPage(container, business) {
 export async function renderStoryDetail(container, business, key) {
   container.classList.remove('is-hidden');
   bindStoryNavigation(container);
-  container.innerHTML = `<div class="detail-page"><div class="detail-skeleton">正在加载剧情…</div></div>`;
+
+  const config = getStoryConfig(business);
+  if (!config) {
+    container.innerHTML = notice(business, '剧情', '该业务未启用剧情模块。');
+    return;
+  }
+
+  container.innerHTML = skeleton();
 
   let story = null;
   try {
     const res = await api(`/api/stories/${encodeURIComponent(business)}/${encodeURIComponent(key)}`);
     story = res?.data || res;
   } catch (e) {
-    container.innerHTML = `
-      <div class="detail-page">
-        <header class="detail-header">
-          <button class="ghost-btn detail-back" type="button" data-story-back>← 返回</button>
-          <p class="detail-breadcrumb">${escapeHtml(business)} / 剧情库</p>
-        </header>
-        <div class="detail-section"><h2>剧情</h2><p class="detail-muted">剧情数据接口尚未接入。</p></div>
-      </div>`;
+    container.innerHTML = notice(business, '剧情', '剧情数据接口尚未接入。');
     return;
   }
 
   if (!story) {
-    container.innerHTML = `
-      <div class="detail-page">
-        <header class="detail-header">
-          <button class="ghost-btn detail-back" type="button" data-story-back>← 返回</button>
-          <p class="detail-breadcrumb">${escapeHtml(business)} / 剧情库</p>
-        </header>
-        <div class="detail-section"><h2>剧情</h2><p class="detail-muted">未找到该剧情（${escapeHtml(key)}）。</p></div>
-      </div>`;
+    container.innerHTML = notice(business, '剧情', `未找到该剧情（${key}）。`);
     return;
   }
 
-  const title = pickZh(story.title) || key;
-  const lines = Array.isArray(story.lines) ? story.lines : [];
-  const characters = Array.isArray(story.characters) ? story.characters : [];
+  const title = pickBlock(story[config.fields.title], config.fields.title) || key;
+  const chapter = pickBlock(story[config.fields.chapter], config.fields.chapter);
+  const episode = pickBlock(story[config.fields.episode], config.fields.episode);
+  const summary = pickBlock(story[config.fields.summary], config.fields.summary);
+  const lines = Array.isArray(story[config.fields.lines]) ? story[config.fields.lines] : [];
+  const characters = Array.isArray(story[config.fields.characters]) ? story[config.fields.characters] : [];
 
   container.innerHTML = `
     <div class="detail-page">
@@ -176,14 +182,14 @@ export async function renderStoryDetail(container, business, key) {
       <section class="detail-hero">
         <div class="detail-hero-text">
           <h1>${escapeHtml(title)}</h1>
-          ${story.chapter ? `<p class="detail-subname">${escapeHtml(pickZh(story.chapter))}</p>` : ''}
-          ${story.episode_no ? `<p class="detail-subname">${escapeHtml(pickZh(story.episode_no))}</p>` : ''}
-          <p class="detail-subname">${escapeHtml(categoryLabel(story.category))}</p>
+          ${chapter ? `<p class="detail-subname">${escapeHtml(chapter)}</p>` : ''}
+          ${episode ? `<p class="detail-subname">${escapeHtml(episode)}</p>` : ''}
+          <p class="detail-subname">${escapeHtml(categoryLabel(config, story[config.fields.category]))}</p>
         </div>
       </section>
       <div class="detail-body">
-        ${story.summary && pickZh(story.summary)
-          ? `<section class="detail-section"><h2>概述</h2><div class="detail-text">${escapeHtml(pickZh(story.summary))}</div></section>`
+        ${summary
+          ? `<section class="detail-section"><h2>概述</h2><div class="detail-text">${escapeHtml(summary)}</div></section>`
           : ''}
         ${characters.length
           ? `<section class="detail-section"><h2>登场角色</h2><div class="detail-tags">${characters.map((c) => `<span class="detail-tag">${escapeHtml(c)}</span>`).join('')}</div></section>`

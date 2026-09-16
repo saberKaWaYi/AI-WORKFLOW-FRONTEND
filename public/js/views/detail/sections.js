@@ -70,8 +70,6 @@ export function renderSection(section, data, lang) {
       return renderObjectSection(title, pickLocalizedObject(data, field, lang), section.labels);
     case 'titled-list':
       return renderTitledListSection(title, pickLocalizedList(data, field, lang));
-    case 'scp-links':
-      return renderScpLinksSection(title, pickLocalizedList(data, field, lang));
     case 'image-list':
       return renderImageSection(title, data[field]);
     case 'gif-list':
@@ -80,16 +78,12 @@ export function renderSection(section, data, lang) {
       const voiceList = Array.isArray(data[field]) ? data[field] : [];
       return renderVoice(voiceList, ensureVoiceLanguage(voiceList));
     }
-    case 'pcr-skills':
-      return renderPcrSkills(data[field]);
-    case 'pcr-bonds':
-      return renderPcrBonds(data[field]);
-    case 'pcr-voices':
-      return renderPcrVoices(data[field]);
-    case 'pcr-chapters':
-      return renderPcrChapters(data[field]);
-    case 'pcr-story-lines':
-      return renderPcrStoryLines(data[field]);
+    case 'entry-list':
+      return renderEntryListSection(title, pickRawOrLocalized(data, field, lang), section.map);
+    case 'audio-list':
+      return renderAudioListSection(title, pickRawOrLocalized(data, field, lang), section.map);
+    case 'dialogue-list':
+      return renderDialogueListSection(title, pickRawOrLocalized(data, field, lang), section.map);
     default:
       return renderAutoSection(title, raw);
   }
@@ -202,33 +196,6 @@ export function renderKeyValueSection(title, items) {
           </article>
         `).join('')}
       </div>
-    </section>
-  `;
-}
-
-export function renderScpLinksSection(title, items) {
-  if (!Array.isArray(items) || !items.length) return '';
-  const cards = items
-    .map((item) => {
-      const id = item?.scp_id || item?.scpId || item?.key || '';
-      if (!id) return '';
-      const relation = item?.relationship || item?.relation || '';
-      return `
-        <button class="detail-related-card" type="button" data-related-id="${escapeHtml(String(id))}" aria-label="${escapeHtml(String(id))}">
-          <div>
-            <strong>${escapeHtml(String(id))}</strong>
-            ${relation ? `<div class="detail-related-relations"><span class="detail-related-relation">${escapeHtml(relation)}</span></div>` : ''}
-          </div>
-        </button>
-      `;
-    })
-    .filter(Boolean)
-    .join('');
-  if (!cards) return '';
-  return `
-    <section class="detail-section" data-section="${escapeHtml(title)}">
-      <h2>${escapeHtml(title)}</h2>
-      <div class="detail-related-grid">${cards}</div>
     </section>
   `;
 }
@@ -363,6 +330,13 @@ function pickLocalizedMap(data, field, lang) {
   return [];
 }
 
+/** 组合型区块优先取原始值（多为数组），取不到再退回本地化块。 */
+function pickRawOrLocalized(data, field, lang) {
+  const raw = data?.[field];
+  if (Array.isArray(raw) || (raw && typeof raw === 'object')) return raw;
+  return pickLocalizedRaw(data, field, lang);
+}
+
 function pickStoryList(data, lang) {
   const stories = data?.storys;
   if (!stories || typeof stories !== 'object') return [];
@@ -377,112 +351,192 @@ function excerpt(text, maxLength) {
   return value.length > maxLength ? `${value.slice(0, maxLength)}…` : value;
 }
 
-/* ---------- pcr 专用渲染器（字段结构为 pcr 特有，通用 type 接不住）---------- */
+/* ---------- 组合型区块 ---------- */
 
-function renderPcrSkills(skills) {
-  if (!Array.isArray(skills) || !skills.length) return '';
-  const cards = skills.map((s, index) => {
-    if (!s || typeof s !== 'object') return '';
-    const name = [s.name_zh, s.name_extra].filter(Boolean).join(' ');
-    const desc = s.description || '';
-    const upName = s.upgraded_name_zh;
-    const upDesc = s.upgraded_description;
-    return `
-      <article class="detail-entry pcr-skill-card">
-        ${name ? `<div class="detail-entry-head"><span class="pcr-skill-icon">${index + 1}</span><span class="detail-entry-title">${escapeHtml(name)}</span>${s.slot != null ? `<span class="detail-entry-badge pcr-skill-slot">${escapeHtml(String(s.slot))}</span>` : ''}</div>` : ''}
-        ${desc ? `<div class="detail-entry-body">${escapeHtml(desc)}</div>` : ''}
-        ${(upName || upDesc) ? `<div class="detail-entry-body detail-entry-upgraded"><strong>升级后</strong>${escapeHtml([upName, upDesc].filter(Boolean).join(' — '))}</div>` : ''}
-      </article>`;
-  }).filter(Boolean).join('');
-  if (!cards) return '';
-  return `<section class="detail-section" data-section="技能"><h2>技能</h2><div class="detail-entry-list">${cards}</div></section>`;
+/**
+ * 以下是「字段映射型」渲染器：渲染器只认 heading / badge / body / extra 这类**角色**，
+ * 具体从数据里哪个字段取值由 profile 的 map 声明。
+ * 这样不同业务的字段命名差异被 profile 吸收，渲染器保持业务无关。
+ */
+
+const DEFAULT_ENTRY_MAP = {
+  heading: ['title', 'name'],
+  badge: ['badge', 'type'],
+  body: ['content', 'text', 'description']
+};
+
+const DEFAULT_AUDIO_MAP = { heading: ['title', 'name', 'scene'], urls: ['urls', 'voices'] };
+
+const DEFAULT_DIALOGUE_MAP = {
+  groups: 'chapters',
+  heading: ['title', 'group'],
+  lines: 'lines',
+  speaker: 'speaker',
+  text: 'text',
+  voice: 'voice',
+  note: 'note'
+};
+
+/** 从一个条目里按映射取若干字段，拼接成字符串（支持多字段 fallback）。 */
+function pickMapped(item, keys) {
+  const list = Array.isArray(keys) ? keys : keys ? [keys] : [];
+  return list
+    .map((key) => item?.[key])
+    .filter((value) => value != null && value !== '')
+    .map(String)
+    .join(' ')
+    .trim();
 }
 
-function renderPcrBonds(bonds) {
-  if (!Array.isArray(bonds) || !bonds.length) return '';
-  const cards = bonds.map((b) => {
-    if (!b || typeof b !== 'object') return '';
-    const level = b.level != null ? `Lv.${b.level}` : '';
-    const effect = b.effect || '';
-    return `
-      <article class="detail-entry pcr-bond-card">
-        ${level ? `<div class="detail-entry-head"><span class="pcr-bond-icon">♥</span><span class="detail-entry-title pcr-bond-level">${escapeHtml(level)}</span></div>` : ''}
-        ${effect ? `<div class="detail-entry-body">${escapeHtml(effect)}</div>` : ''}
-      </article>`;
-  }).filter(Boolean).join('');
-  if (!cards) return '';
-  return `<section class="detail-section" data-section="羁绊"><h2>羁绊</h2><div class="detail-entry-list">${cards}</div></section>`;
+/** 从一个条目里按映射取列表字段（支持多字段 fallback）。 */
+function pickMappedList(item, keys) {
+  const list = Array.isArray(keys) ? keys : keys ? [keys] : [];
+  for (const key of list) {
+    const value = asArray(item?.[key]);
+    if (value.length) return value;
+  }
+  return [];
 }
 
-function renderPcrVoices(otherVoices) {
-  if (!Array.isArray(otherVoices) || !otherVoices.length) return '';
-  const cards = otherVoices.map((item) => {
-    if (!item || typeof item !== 'object') return '';
-    const scene = item.scene || '';
-    const urls = Array.isArray(item.voices) ? item.voices.filter((u) => typeof u === 'string' && u) : [];
-    if (!urls.length) return '';
-    const audios = urls.map((u, i) => `
-      <div class="pcr-voice-audio">
-        <span class="pcr-voice-index">${i + 1}</span>
-        <audio controls preload="none" src="${escapeHtml(u)}"></audio>
-      </div>`).join('');
-    return `
-      <article class="detail-entry pcr-voice-card">
-        ${scene ? `<div class="detail-entry-head"><span class="pcr-voice-scene">${escapeHtml(scene)}</span></div>` : ''}
-        <div class="pcr-voice-stack">${audios}</div>
-      </article>`;
-  }).filter(Boolean).join('');
-  if (!cards) return '';
-  return `<section class="detail-section" data-section="语音"><h2>语音</h2><div class="detail-entry-list pcr-voice-list">${cards}</div></section>`;
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
 }
 
-function renderPcrChapters(stories) {
-  if (!stories || typeof stories !== 'object') return '';
-  const chapters = Array.isArray(stories.chapters) ? stories.chapters : [];
-  if (!chapters.length) return '';
-  const cards = chapters.map((c, index) => {
-    if (!c || typeof c !== 'object') return '';
-    const title = c.title || '';
-    const lines = Array.isArray(c.lines) ? c.lines : [];
-    const lineHtml = lines.map((ln) => {
-      if (!ln || typeof ln !== 'object') return '';
-      const speaker = ln.speaker ? escapeHtml(ln.speaker) : '';
-      const text = ln.text ? escapeHtml(ln.text) : '';
-      return `<div class="detail-dialogue-line">${speaker ? `<div class="story-speaker">${speaker}</div>` : ''}<p class="story-text">${text}</p></div>`;
-    }).filter(Boolean).join('');
-    const body = lineHtml || '<p class="detail-muted">（暂无台词文本）</p>';
-    return `
-      <article class="detail-entry pcr-chapter-card">
-        ${title ? `<div class="detail-entry-head"><span class="pcr-chapter-index">${index + 1}</span><span class="detail-entry-title">${escapeHtml(title)}</span></div>` : ''}
-        <div class="detail-dialogue">${body}</div>
-      </article>`;
-  }).filter(Boolean).join('');
+/**
+ * entry-list：条目卡片列表。
+ * map: { heading, badge, body, extra, extraLabel, icon, ordinal, headingPrefix, variant }
+ */
+export function renderEntryListSection(title, items, map) {
+  const list = asArray(items);
+  if (!list.length) return '';
+  const conf = { ...DEFAULT_ENTRY_MAP, ...(map || {}) };
+  const cards = list
+    .map((item, index) => {
+      if (!item || typeof item !== 'object') return '';
+      const heading = pickMapped(item, conf.heading);
+      const badge = pickMapped(item, conf.badge);
+      const body = pickMapped(item, conf.body);
+      const extra = pickMapped(item, conf.extra);
+      if (!heading && !body && !extra) return '';
+      const prefix = conf.headingPrefix || '';
+      const iconMark = conf.icon
+        ? `<span class="detail-entry-icon">${escapeHtml(conf.icon)}</span>`
+        : conf.ordinal
+          ? `<span class="detail-entry-icon">${index + 1}</span>`
+          : '';
+      return `
+        <article class="detail-entry${conf.variant ? ` ${conf.variant}` : ''}">
+          ${heading || badge
+            ? `<div class="detail-entry-head">${iconMark}${heading ? `<span class="detail-entry-title">${escapeHtml(prefix + heading)}</span>` : ''}${badge ? `<span class="detail-entry-badge">${escapeHtml(badge)}</span>` : ''}</div>`
+            : ''}
+          ${body ? `<div class="detail-entry-body">${escapeHtml(body)}</div>` : ''}
+          ${extra
+            ? `<div class="detail-entry-body detail-entry-extra">${conf.extraLabel ? `<strong>${escapeHtml(conf.extraLabel)}</strong>` : ''}${escapeHtml(extra)}</div>`
+            : ''}
+        </article>`;
+    })
+    .filter(Boolean)
+    .join('');
   if (!cards) return '';
-  const url = typeof stories.url === 'string' && stories.url
-    ? `<p class="detail-muted pcr-story-link"><a href="${escapeHtml(stories.url)}" target="_blank" rel="noopener">查看完整故事 →</a></p>`
+  return `
+    <section class="detail-section" data-section="${escapeHtml(title)}">
+      <h2>${escapeHtml(title)}</h2>
+      <div class="detail-entry-list">${cards}</div>
+    </section>
+  `;
+}
+
+/** audio-list：分组音频列表。map: { heading, urls } */
+export function renderAudioListSection(title, items, map) {
+  const list = asArray(items);
+  if (!list.length) return '';
+  const conf = { ...DEFAULT_AUDIO_MAP, ...(map || {}) };
+  const cards = list
+    .map((item) => {
+      if (!item || typeof item !== 'object') return '';
+      const heading = pickMapped(item, conf.heading);
+      const urls = pickMappedList(item, conf.urls).filter((url) => typeof url === 'string' && url);
+      if (!urls.length) return '';
+      return `
+        <article class="detail-entry detail-audio-card">
+          ${heading ? `<div class="detail-entry-head"><span class="detail-entry-title detail-audio-scene">${escapeHtml(heading)}</span></div>` : ''}
+          <div class="detail-audio-stack">
+            ${urls.map((url, i) => `
+              <div class="detail-audio-item">
+                <span class="detail-audio-index">${i + 1}</span>
+                <audio controls preload="none" src="${escapeHtml(url)}"></audio>
+              </div>`).join('')}
+          </div>
+        </article>`;
+    })
+    .filter(Boolean)
+    .join('');
+  if (!cards) return '';
+  return `
+    <section class="detail-section" data-section="${escapeHtml(title)}">
+      <h2>${escapeHtml(title)}</h2>
+      <div class="detail-entry-list detail-audio-list">${cards}</div>
+    </section>
+  `;
+}
+
+/**
+ * dialogue-list：对话组列表（一组台词）。
+ * map: { groups, heading, lines, speaker, text, voice, note, scroll, link, variant, icon }
+ * groups 为空时，items 本身即对话组数组。
+ */
+export function renderDialogueListSection(title, items, map) {
+  if (!items || typeof items !== 'object') return '';
+  const conf = { ...DEFAULT_DIALOGUE_MAP, ...(map || {}) };
+  const groups = Array.isArray(items) ? items : asArray(items?.[conf.groups]);
+  if (!groups.length) return '';
+
+  const cards = groups
+    .map((group) => {
+      if (!group || typeof group !== 'object') return '';
+      const heading = pickMapped(group, conf.heading);
+      const lines = asArray(group?.[conf.lines]);
+      if (!heading && !lines.length) return '';
+      const lineHtml = lines
+        .map((line, index) => {
+          if (!line || typeof line !== 'object') return '';
+          const speaker = pickMapped(line, conf.speaker);
+          const text = pickMapped(line, conf.text);
+          const voice = pickMapped(line, conf.voice);
+          const note = pickMapped(line, conf.note);
+          // 单条台词不显示序号；整组无 speakers 时才用序号区分行
+          const indexMark = conf.lineIndex && text ? `<span class="detail-line-index">${index + 1}</span>` : '';
+          return `
+            <div class="detail-dialogue-line">
+              ${speaker ? `<div class="story-speaker">${escapeHtml(speaker)}</div>` : ''}
+              ${text ? `<p class="story-text">${indexMark}${escapeHtml(text)}</p>` : ''}
+              ${voice ? `<div class="detail-line-audio"><audio controls preload="none" src="${escapeHtml(voice)}"></audio></div>` : ''}
+              ${note ? `<small class="detail-muted">${escapeHtml(note)}</small>` : ''}
+            </div>`;
+        })
+        .filter(Boolean)
+        .join('');
+      const iconMark = conf.icon ? `<span class="detail-entry-icon">${escapeHtml(conf.icon)}</span>` : '';
+      return `
+        <article class="detail-entry${conf.variant ? ` ${conf.variant}` : ''}">
+          ${heading ? `<div class="detail-entry-head">${iconMark}<span class="detail-entry-title">${escapeHtml(heading)}</span></div>` : ''}
+          <div class="detail-dialogue">${lineHtml || '<p class="detail-muted">（暂无台词文本）</p>'}</div>
+        </article>`;
+    })
+    .filter(Boolean)
+    .join('');
+
+  if (!cards) return '';
+  const link = typeof conf.link === 'string' && typeof items?.[conf.link] === 'string' && items[conf.link]
+    ? `<p class="detail-muted detail-story-link"><a href="${escapeHtml(items[conf.link])}" target="_blank" rel="noopener">查看完整内容 →</a></p>`
     : '';
-  return `<section class="detail-section" data-section="角色故事"><h2>角色故事</h2><div class="detail-story-scroll"><div class="detail-entry-list">${cards}</div></div>${url}</section>`;
-}
-
-function renderPcrStoryLines(storyLines) {
-  if (!Array.isArray(storyLines) || !storyLines.length) return '';
-  const cards = storyLines.map((item) => {
-    if (!item || typeof item !== 'object') return '';
-    const group = item.group || '';
-    const lines = Array.isArray(item.lines) ? item.lines : [];
-    const lineHtml = lines.map((ln, i) => {
-      if (!ln || typeof ln !== 'object') return '';
-      const text = ln.text || '';
-      const voice = typeof ln.voice === 'string' && ln.voice ? `<div class="pcr-story-voice"><audio controls preload="none" src="${escapeHtml(ln.voice)}"></audio></div>` : '';
-      const note = ln.note ? `<small class="detail-muted">${escapeHtml(ln.note)}</small>` : '';
-      return `<div class="detail-dialogue-line">${text ? `<p class="story-text"><span class="pcr-line-index">${i + 1}</span>${escapeHtml(text)}</p>` : ''}${voice}${note}</div>`;
-    }).filter(Boolean).join('');
-    return `
-      <article class="detail-entry pcr-story-group">
-        ${group ? `<div class="detail-entry-head"><span class="pcr-group-icon">❖</span><span class="detail-entry-title">${escapeHtml(group)}</span></div>` : ''}
-        <div class="detail-dialogue">${lineHtml}</div>
-      </article>`;
-  }).filter(Boolean).join('');
-  if (!cards) return '';
-  return `<section class="detail-section" data-section="剧情台词"><h2>剧情台词</h2><div class="detail-entry-list">${cards}</div></section>`;
+  const body = conf.scroll
+    ? `<div class="detail-story-scroll"><div class="detail-entry-list">${cards}</div></div>`
+    : `<div class="detail-entry-list">${cards}</div>`;
+  return `
+    <section class="detail-section" data-section="${escapeHtml(title)}">
+      <h2>${escapeHtml(title)}</h2>
+      ${body}${link}
+    </section>
+  `;
 }

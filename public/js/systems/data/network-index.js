@@ -112,7 +112,7 @@ export function findNodeByKey(index, identifier) {
 
 /** 边的稳定标识，用于高亮与去重。 */
 export function edgeKey(edge) {
-  return `${edge.source_vid}->${edge.target_vid}::${edge.id || pickEdgeTextWithFallback(edge, LANGUAGES.EN) || ''}`;
+  return `${edge.source_vid}->${edge.target_vid}::${pickEdgeTextWithFallback(edge, LANGUAGES.EN) || ''}`;
 }
 
 /** 相关关系的去重键：端点 + 中英文文案，避免同关系被重复展示。 */
