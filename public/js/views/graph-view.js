@@ -292,7 +292,7 @@ function drawNodeBody(node) {
   ctx.font = `700 ${Math.max(12, node.r * 0.75)}px Segoe UI, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(String(getName(node, runtime.language) || node.vid).slice(0, 1).toUpperCase(), node.x, node.y + 1);
+  ctx.fillText(String(getName(node, runtime.language)).slice(0, 1).toUpperCase(), node.x, node.y + 1);
   ctx.restore();
 }
 

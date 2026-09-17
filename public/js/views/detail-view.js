@@ -6,14 +6,19 @@ import { navigateToDetail, navigateToStory } from '../core/router.js';
 import {
   edgeEndpoint,
   getName,
-  getOtherName,
   getRelationText,
   otherLanguage,
   pickImageUrl,
   pickLocalized,
   upgradeImageUrl
 } from '../systems/data/node-fields.js';
-import { resolveProfile, getHeroTexts, getStoryConfig } from '../systems/data/business-profile.js';
+import {
+  requireProfile,
+  checkMongoContract,
+  getHeroTexts,
+  getStoryConfig
+} from '../systems/data/business-profile.js';
+import { logViolations, renderContractErrors } from '../systems/data/contract.js';
 import { getRelatedNodes } from '../systems/data/network-index.js';
 import { renderMetaSection, renderSection, setVoiceLanguage } from './detail/sections.js';
 
@@ -96,11 +101,41 @@ async function loadDetail(nodeId, requestSeq) {
   renderLoading(nodeId);
 
   const params = new URLSearchParams({ business_name: state.dataSource, name: nodeId });
-  const result = await api(`/api/nodes?${params}`);
+  let result;
+  try {
+    result = await api(`/api/nodes?${params}`);
+  } catch (error) {
+    if (requestSeq !== detailRequestSeq) return;
+    state.detail.loading = false;
+    renderError(nodeId, `详情接口请求失败：${error?.message || error}`);
+    return;
+  }
   if (requestSeq !== detailRequestSeq) return;
-  state.detail.data = result.data;
+  state.detail.data = result?.data ?? null;
   state.detail.loading = false;
-  renderDetail(nodeId);
+
+  try {
+    renderDetail(nodeId);
+  } catch (error) {
+    renderError(nodeId, error?.message || String(error));
+    console.error(error);
+  }
+}
+
+/** 致命错误：无法继续渲染时整页报错，不做"能显示多少算多少"。 */
+function renderError(nodeId, message) {
+  container.innerHTML = `
+    <div class="detail-page">
+      <header class="detail-header">
+        <button class="ghost-btn detail-back" type="button" data-detail-back>${escapeHtml(DATA_TEXT.back)}</button>
+        <p class="detail-breadcrumb">${escapeHtml(state.dataSource)} / ${escapeHtml(nodeId)}</p>
+      </header>
+      <div class="detail-error">
+        <strong>无法渲染该条目</strong>
+        <p>${escapeHtml(message)}</p>
+      </div>
+    </div>
+  `;
 }
 
 function renderLoading(nodeId) {
@@ -118,26 +153,31 @@ function renderLoading(nodeId) {
 function renderDetail(nodeId) {
   const data = state.detail.data || {};
   const lang = state.dataLanguage || LANGUAGES.ZH;
-  const profile = resolveProfile(state.dataSource, data);
-  const node = state.data.nodes?.find((item) => item.vid === nodeId);
-  const namePrimary = pickLocalized(data, 'name', lang) || getName(node, lang) || nodeId;
-  const nameSecondary = getOtherName(node, lang) || pickLocalized(data, 'name', otherLanguage(lang));
-  const portrait = pickHeroImage(profile, data, node, lang);
+  // 业务没注册就抛错，前端不猜字段结构
+  const profile = requireProfile(state.dataSource);
+  const violations = checkMongoContract(profile, data, lang);
+  logViolations(violations, `mongo 文档 ${data.key || nodeId}`);
+  const errorsHtml = renderContractErrors(violations, `mongo 文档 ${data.key || nodeId}`);
+
+  const namePrimary = pickLocalized(data, 'name', lang);
+  const nameSecondary = pickLocalized(data, 'name', otherLanguage(lang));
+  const portrait = pickHeroImage(profile, data, lang);
   const heroTexts = getHeroTexts(profile, data, lang);
-  const related = getRelatedNodes(detailIndex || { relatedById: new Map() }, nodeId);
+  const related = getRelatedNodes(detailIndex || { relatedById: new Map() }, nodeId, lang);
   const storyConfig = getStoryConfig(state.dataSource);
 
   container.innerHTML = `
     <div class="detail-page" data-business="${escapeHtml(state.dataSource)}">
+      ${errorsHtml}
       <header class="detail-header">
         <button class="ghost-btn detail-back" type="button" data-detail-back>${escapeHtml(DATA_TEXT.back)}</button>
-        <p class="detail-breadcrumb">${escapeHtml(state.dataSource)} / ${escapeHtml(labelSource(state.detail.sourceView))} / ${escapeHtml(namePrimary)}</p>
+        <p class="detail-breadcrumb">${escapeHtml(state.dataSource)} / ${escapeHtml(labelSource(state.detail.sourceView))} / ${escapeHtml(namePrimary || nodeId)}</p>
       </header>
 
       <section class="detail-hero">
         <div class="detail-portrait">${portrait ? `<img src="${escapeHtml(portrait)}" alt="${escapeHtml(namePrimary)}" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : ''}</div>
         <div class="detail-hero-text">
-          <h1>${escapeHtml(namePrimary)}</h1>
+          <h1>${escapeHtml(namePrimary || nodeId)}</h1>
           ${nameSecondary ? `<p class="detail-subname">${escapeHtml(nameSecondary)}</p>` : ''}
           ${heroTexts.map((text) => renderLine(text)).join('')}
         </div>
@@ -157,19 +197,19 @@ function renderDetail(nodeId) {
   }
 }
 
-function pickHeroImage(profile, data, node, lang) {
+/**
+ * 头图只有一个来源，由 profile.heroImage 声明：
+ * `{ source: 'localized', field }` 读本地化块，其余 source 即字段名读数组首项。
+ * 没有声明（如后室这类纯文本站）就是不显示，不再拿 nebula 的 photo 顶上。
+ */
+function pickHeroImage(profile, data, lang) {
   const config = profile.heroImage;
-  if (config?.source === 'pngs') {
-    return upgradeImageUrl(pickImageUrl(data?.pngs?.[0])) || node?.properties?.photo || '';
+  if (!config?.source) return '';
+  if (config.source === 'localized') {
+    if (!config.field) throw new Error('heroImage.source 为 localized 时必须声明 field');
+    return upgradeImageUrl(pickLocalized(data, config.field, lang));
   }
-  if (config?.source === 'localized' && config.field) {
-    return upgradeImageUrl(pickLocalized(data, config.field, lang)) || node?.properties?.photo || '';
-  }
-  if (config?.source === 'avatars') {
-    const url = data?.avatars?.[0]?.url || node?.properties?.photo || '';
-    return upgradeImageUrl(url);
-  }
-  return upgradeImageUrl(node?.properties?.photo || '');
+  return upgradeImageUrl(pickImageUrl(data?.[config.source]?.[0], config.imageField));
 }
 
 function renderLine(text, className = '') {
@@ -197,8 +237,8 @@ function renderSections(profile, data, lang) {
 }
 
 function renderRelated(related, lang, profile) {
-  const title = profile?.relatedTitle || DATA_TEXT.relatedTitle;
-  const noRelated = profile?.noRelated || DATA_TEXT.noRelated;
+  const title = profile.relatedTitle;
+  const noRelated = profile.noRelated;
 
   if (!related.length) {
     return `
@@ -221,7 +261,7 @@ function renderRelated(related, lang, profile) {
               <div>
                 <strong>${escapeHtml(label)}</strong>
                 <div class="detail-related-relations">
-                  ${relations.map(({ edge }) => renderRelatedRelation(edge, lang, node.vid)).join('')}
+                  ${relations.map(({ edge }) => renderRelatedRelation(edge, lang)).join('')}
                 </div>
               </div>
             </button>
@@ -232,13 +272,13 @@ function renderRelated(related, lang, profile) {
   `;
 }
 
-function renderRelatedRelation(edge, lang, fallback) {
+function renderRelatedRelation(edge, lang) {
   const source = edgeEndpoint(edge, 'source', lang);
   const target = edgeEndpoint(edge, 'target', lang);
   return `
     <span class="detail-related-relation">
       <small>${escapeHtml(source)} → ${escapeHtml(target)}</small>
-      ${escapeHtml(getRelationText(edge, lang) || fallback)}
+      ${escapeHtml(getRelationText(edge, lang))}
     </span>
   `;
 }
@@ -249,19 +289,19 @@ function labelSource(sourceView) {
 
 /**
  * 剧情模块入口：按角色名关联该业务独立的剧情表（接口按业务泛化，非某业务专属）。
- * 后端接口尚未提供时优雅降级为提示，不影响角色详情本身渲染。
+ * 接口失败就是失败，明确报错，不用"尚未接入"把问题糊过去。
  */
 async function loadRelatedStories(container, data, lang, storyConfig) {
   const anchor = container.querySelector('[data-story-anchor]');
   if (!anchor) return;
   const name = pickLocalized(data, 'name', lang);
   if (!name) {
-    anchor.innerHTML = '<p class="detail-muted">暂无剧情关联</p>';
+    anchor.innerHTML = '<p class="detail-muted">条目缺少名称，无法关联剧情。</p>';
     return;
   }
   try {
     const res = await api(`/api/stories/${encodeURIComponent(state.dataSource)}?character=${encodeURIComponent(name)}`);
-    const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+    const list = Array.isArray(res?.data) ? res.data : [];
     if (!list.length) {
       anchor.innerHTML = '<p class="detail-muted">该角色暂无关联剧情。</p>';
       return;
@@ -269,16 +309,18 @@ async function loadRelatedStories(container, data, lang, storyConfig) {
     anchor.innerHTML = `
       <h2>${escapeHtml(storyConfig.title)}</h2>
       <div class="detail-related-grid">
-        ${list.map((s) => {
-          const key = escapeHtml(s.key || '');
-          const title = escapeHtml(pickLocalized(s, storyConfig.fields.title, lang) || key);
+        ${list.map((story) => {
+          if (!story.key) throw new Error('剧情文档缺少 key，无法生成跳转');
+          const key = escapeHtml(story.key);
+          const title = escapeHtml(pickLocalized(story, storyConfig.fields.title, lang));
           return `<button class="detail-related-card" type="button" data-story-key="${key}"><div><strong>${title}</strong></div></button>`;
         }).join('')}
       </div>`;
     anchor.querySelectorAll('[data-story-key]').forEach((el) => {
       el.addEventListener('click', () => navigateToStory(el.dataset.storyKey));
     });
-  } catch (e) {
-    anchor.innerHTML = '<p class="detail-muted">剧情数据接口尚未接入。</p>';
+  } catch (error) {
+    console.error(error);
+    anchor.innerHTML = `<p class="detail-error">剧情加载失败：${escapeHtml(error?.message || String(error))}</p>`;
   }
 }

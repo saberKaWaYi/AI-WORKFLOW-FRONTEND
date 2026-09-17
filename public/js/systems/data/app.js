@@ -4,6 +4,7 @@ import { DETAIL_SOURCE_VIEWS, DISPLAY_TYPES, SYSTEM_IDS } from '../../core/const
 import { formatText } from '../../core/utils.js';
 import { navigateToDataMain, navigateToDetail, ROUTE_PAGES } from '../../core/router.js';
 import { compareNodes } from './node-fields.js';
+import { logViolations, renderContractErrors } from './contract.js';
 import { getDataIndex, initConfigPanel, loadBusinesses, restoreConfigFromState, syncFilterUiValues } from './config-panel.js';
 import { findNodeByKey } from './network-index.js';
 import { initListView, renderList, matchesQuery, closeListPanel } from '../../views/list-view.js';
@@ -27,6 +28,7 @@ const DATA_DOM_KEYS = [
   'detailView',
   'emptyPage',
   'mainHeader',
+  'contractErrors',
   'statusText',
   'totalCount',
   'visibleCount',
@@ -161,6 +163,7 @@ function renderDataPage(options = {}) {
 
   dom.emptyPage?.classList.add('is-hidden');
   dom.mainHeader?.classList.remove('is-hidden');
+  renderNetworkContractErrors();
 
   if (state.view === DISPLAY_TYPES.CARDS) {
     dom.cardGrid?.classList.remove('is-hidden');
@@ -169,6 +172,13 @@ function renderDataPage(options = {}) {
     dom.graphWrap?.classList.remove('is-hidden');
     renderGraphMain(options);
   }
+}
+
+/** nebula 是通用契约，违约要摆在页面最显眼的位置，而不是只写进控制台。 */
+function renderNetworkContractErrors() {
+  if (!dom.contractErrors) return;
+  const violations = state.data?.contractViolations || [];
+  dom.contractErrors.innerHTML = renderContractErrors(violations, `nebula 图 ${state.dataSource}`);
 }
 
 function renderCardsMain() {

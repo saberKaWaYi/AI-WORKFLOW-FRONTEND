@@ -4,6 +4,7 @@ import { saveDataState, state } from '../../core/state.js';
 import { escapeHtml } from '../../core/utils.js';
 import { normalizeData, rebuildIndexes, createIndex } from './network-index.js';
 import { compareNodes, getName } from './node-fields.js';
+import { logViolations } from './contract.js';
 
 let dom = {};
 let index = createIndex();
@@ -37,6 +38,7 @@ export async function loadBusinesses() {
 async function loadNetwork(sourceKey) {
   const data = await api(`/api/network/${encodeURIComponent(sourceKey)}`);
   state.data = normalizeData(data);
+  logViolations(state.data.contractViolations, `nebula 图 ${sourceKey}`);
   populateLanguageOptions();
   syncLanguageControls();
 }

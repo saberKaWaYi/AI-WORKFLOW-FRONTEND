@@ -3,7 +3,48 @@
  * 提供节点度、邻接关系、焦点扩散与最短路径等只读派生数据。
  */
 import { LANGUAGES } from '../../core/constants.js';
-import { pickEdgeText, pickEdgeTextWithFallback } from './node-fields.js';
+import { pickEdgeText } from './node-fields.js';
+import { SCOPE, createChecker } from './contract.js';
+
+/**
+ * nebula 数据是所有业务共用的同一套字段，因此这里做全量校验：
+ * 节点必须有 vid 与 name_{lang}，边必须有端点与两端名称，缺一个就是违约。
+ * 违约不会中断加载，而是挂在 data.contractViolations 上由页面渲染成错误面板。
+ */
+function checkNebulaContract(data, languages) {
+  const checker = createChecker('nebula 图数据');
+
+  checker.expect(
+    languages.length > 0,
+    SCOPE.NEBULA, '(图数据)', 'has_chinese / has_english',
+    '后端未声明可用语言，前端无法确定该校验哪些字段'
+  );
+
+  (data.nodes || []).forEach((node) => {
+    const subject = node.vid || '(缺少 vid 的节点)';
+    checker.require(node.vid, SCOPE.NEBULA, subject, 'vid');
+    languages.forEach((lang) => {
+      checker.require(node.properties?.[`name_${lang}`], SCOPE.NEBULA, subject, `properties.name_${lang}`);
+    });
+  });
+
+  (data.edges || []).forEach((edge) => {
+    const subject = `${edge.source_vid || '?'} -> ${edge.target_vid || '?'}`;
+    checker.require(edge.source_vid, SCOPE.NEBULA, subject, 'source_vid');
+    checker.require(edge.target_vid, SCOPE.NEBULA, subject, 'target_vid');
+    languages.forEach((lang) => {
+      checker.require(edge.properties?.[`source_name_${lang}`], SCOPE.NEBULA, subject, `properties.source_name_${lang}`);
+      checker.require(edge.properties?.[`target_name_${lang}`], SCOPE.NEBULA, subject, `properties.target_name_${lang}`);
+      // 关系文案允许为空字符串，但字段本身必须存在
+      checker.expect(
+        edge.properties?.[`content_${lang}`] !== undefined,
+        SCOPE.NEBULA, subject, `properties.content_${lang}`, '字段缺失（允许为空字符串）'
+      );
+    });
+  });
+
+  return checker.violations;
+}
 
 export function normalizeData(data) {
   if (!Array.isArray(data.nodes) || !Array.isArray(data.edges)) {
@@ -15,6 +56,11 @@ export function normalizeData(data) {
   data.edges.forEach((edge) => {
     edge.properties = edge.properties || {};
   });
+
+  const languages = [];
+  if (data.has_chinese) languages.push(LANGUAGES.ZH);
+  if (data.has_english) languages.push(LANGUAGES.EN);
+  data.contractViolations = checkNebulaContract(data, languages);
   return data;
 }
 
@@ -110,23 +156,21 @@ export function findNodeByKey(index, identifier) {
   return index.nodeByKey.get(key);
 }
 
-/** 边的稳定标识，用于高亮与去重。 */
+/**
+ * 边的稳定标识：端点对。
+ * 不再掺入文案——文案是展示内容，不是标识，用它做键会让"改文案 = 换一条边"。
+ */
 export function edgeKey(edge) {
-  return `${edge.source_vid}->${edge.target_vid}::${pickEdgeTextWithFallback(edge, LANGUAGES.EN) || ''}`;
+  return `${edge.source_vid}->${edge.target_vid}`;
 }
 
-/** 相关关系的去重键：端点 + 中英文文案，避免同关系被重复展示。 */
-function relatedEdgeKey({ edge }) {
-  return [
-    edge.source_vid,
-    edge.target_vid,
-    pickEdgeText(edge, LANGUAGES.ZH),
-    pickEdgeText(edge, LANGUAGES.EN)
-  ].join('::');
+/** 相关关系的去重键：端点 + 当前语言文案，避免同一条关系被重复展示。 */
+function relatedEdgeKey({ edge }, lang) {
+  return `${edge.source_vid}->${edge.target_vid}::${pickEdgeText(edge, lang)}`;
 }
 
 /** 汇总某节点的出边关联，同一对端点的多条关系合并为一组。 */
-export function getRelatedNodes(index, nodeId) {
+export function getRelatedNodes(index, nodeId, lang) {
   const groups = new Map();
 
   for (const item of index.relatedById.get(nodeId) || []) {
@@ -137,7 +181,7 @@ export function getRelatedNodes(index, nodeId) {
       groups.set(relatedId, group);
     }
 
-    const key = relatedEdgeKey(item);
+    const key = relatedEdgeKey(item, lang);
     if (!group.relationKeys.has(key)) {
       group.relationKeys.add(key);
       group.relations.push({ edge: item.edge });

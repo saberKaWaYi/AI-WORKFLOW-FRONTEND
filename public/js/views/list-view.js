@@ -133,7 +133,7 @@ function syncFloatingPanel() {
 }
 
 function renderRelatedList(nodeId) {
-  const relatedList = getRelatedNodes(index || { relatedById: new Map() }, nodeId);
+  const relatedList = getRelatedNodes(index || { relatedById: new Map() }, nodeId, language);
   if (!relatedList.length) {
     return `<div class="related-empty">${escapeHtml(DATA_TEXT.noRelated)}</div>`;
   }
@@ -146,24 +146,23 @@ function renderRelatedList(nodeId) {
 }
 
 function renderRelatedItem({ node, relations }) {
-  const fallback = `ID: ${node.vid}`;
   return `
     <button class="related-item" type="button" data-related-jump data-target-id="${escapeHtml(node.vid)}">
       <strong>${escapeHtml(getName(node, language))}</strong>
       <span class="related-relations">
-        ${relations.map(({ edge }) => renderRelation(edge, fallback)).join('')}
+        ${relations.map(({ edge }) => renderRelation(edge)).join('')}
       </span>
     </button>
   `;
 }
 
-function renderRelation(edge, fallback) {
+function renderRelation(edge) {
   const source = edgeEndpoint(edge, 'source', language);
   const target = edgeEndpoint(edge, 'target', language);
   return `
     <span class="related-relation">
       <small>${escapeHtml(source)} → ${escapeHtml(target)}</small>
-      ${escapeHtml(getRelationText(edge, language) || fallback)}
+      ${escapeHtml(getRelationText(edge, language))}
     </span>
   `;
 }

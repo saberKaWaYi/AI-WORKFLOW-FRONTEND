@@ -44,6 +44,9 @@ const ELEMENT_SELECTORS = {
   emptyPage: '[data-empty-page]',
   mainHeader: '[data-main-header]',
 
+  // 数据系统：契约校验错误面板
+  contractErrors: '[data-contract-errors]',
+
   // 数据系统：统计
   statusText: '[data-status]',
   totalCount: '[data-total]',

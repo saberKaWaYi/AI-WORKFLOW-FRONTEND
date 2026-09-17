@@ -1,6 +1,9 @@
 /**
  * 详情正文的区块渲染器。
  * 全部为纯函数：接收数据与语言，返回 HTML 字符串，不持有业务状态。
+ *
+ * 渲染器只认 heading / body / badge 这类**角色**，具体取数据里哪个字段由 profile 的 map 声明。
+ * 不推断结构、不猜字段名、不做"哪个有值用哪个"——取不到就是没有，契约层负责报错。
  */
 import { escapeHtml } from '../../core/utils.js';
 import {
@@ -38,8 +41,8 @@ export function ensureVoiceLanguage(voice) {
 
 export function renderMetaSection(profile, data, lang) {
   const items = (profile.metaFields || [])
-    .map(([field, label]) => {
-      const value = pickLocalized(data, field, lang);
+    .map(([field, label, blockKey]) => {
+      const value = pickLocalized(data, field, lang, blockKey);
       return value
         ? `<div class="detail-meta-item"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`
         : '';
@@ -56,53 +59,45 @@ export function renderMetaSection(profile, data, lang) {
 }
 
 export function renderSection(section, data, lang) {
-  const { field, title, type } = section;
-  const raw = pickLocalizedRaw(data, field, lang);
+  const { field, title, type, blockKey } = section;
 
   switch (type) {
     case 'text':
-      return renderTextSection(title, pickLocalized(data, field, lang));
-    case 'story-list':
-      return renderListSection(title, pickStoryList(data, lang));
+      return renderTextSection(title, pickLocalized(data, field, lang, blockKey));
+    case 'text-list':
+      return renderListSection(title, pickLocalizedList(data, field, lang, blockKey));
     case 'kv-list':
-      return renderKeyValueSection(title, pickLocalizedMap(data, field, lang));
+      return renderKeyValueSection(title, pickLocalizedMap(data, field, lang, blockKey));
     case 'kv-object':
-      return renderObjectSection(title, pickLocalizedObject(data, field, lang), section.labels);
+      return renderObjectSection(title, pickLocalizedObject(data, field, lang, blockKey), section.labels);
     case 'titled-list':
-      return renderTitledListSection(title, pickLocalizedList(data, field, lang));
+      return renderTitledListSection(title, pickLocalizedList(data, field, lang, blockKey), section.map);
     case 'image-list':
-      return renderImageSection(title, data[field]);
+      return renderImageSection(title, data[field], section.imageField);
     case 'gif-list':
-      return renderGifs(data[field]);
+      return renderGifs(data[field], section.imageField);
     case 'voice': {
       const voiceList = Array.isArray(data[field]) ? data[field] : [];
       return renderVoice(voiceList, ensureVoiceLanguage(voiceList));
     }
     case 'entry-list':
-      return renderEntryListSection(title, pickRawOrLocalized(data, field, lang), section.map);
+      return renderEntryListSection(title, pickSectionValue(data, section, lang), section.map);
     case 'audio-list':
-      return renderAudioListSection(title, pickRawOrLocalized(data, field, lang), section.map);
+      return renderAudioListSection(title, pickSectionValue(data, section, lang), section.map);
     case 'dialogue-list':
-      return renderDialogueListSection(title, pickRawOrLocalized(data, field, lang), section.map);
+      return renderDialogueListSection(title, pickSectionValue(data, section, lang), section.map);
     default:
-      return renderAutoSection(title, raw);
+      throw new Error(`区块 ${field} 声明了未知渲染类型 "${type}"，请在 business-profile 里写明`);
   }
 }
 
-export function renderAutoSection(title, value) {
-  if (value == null || value === '') return '';
-  if (typeof value === 'string') return renderTextSection(title, value);
-  if (Array.isArray(value)) {
-    if (value.length && value.every((item) => item && typeof item === 'object' && ('title' in item || 'content' in item))) {
-      return renderTitledListSection(title, value);
-    }
-    if (value.length && value.every((item) => typeof item === 'string')) {
-      return renderListSection(title, value);
-    }
-    return renderKeyValueSection(title, value);
-  }
-  if (typeof value === 'object') return renderObjectSection(title, value);
-  return '';
+/**
+ * 取区块数据：标记 raw 的字段读原始值（数组 / 对象），其余读 `{字段_zh}` 本地化块。
+ * 由 profile 显式声明，不靠运行时试探。
+ */
+function pickSectionValue(data, section, lang) {
+  if (section.raw) return data?.[section.field] ?? null;
+  return pickLocalizedRaw(data, section.field, lang, section.blockKey);
 }
 
 /* ---------- 各类区块 ---------- */
@@ -130,17 +125,21 @@ export function renderListSection(title, items) {
   `;
 }
 
-export function renderTitledListSection(title, items) {
+export function renderTitledListSection(title, items, map) {
   if (!Array.isArray(items) || !items.length) return '';
+  const conf = { ...DEFAULT_TITLED_MAP, ...(map || {}) };
   const cards = items
     .map((item) => {
       if (item && typeof item === 'object') {
-        const heading = item.title || item.name || '';
-        const body = item.content || item.text || item.description || '';
+        const heading = pickMapped(item, conf.heading);
+        const badge = pickMapped(item, conf.badge);
+        const body = pickMapped(item, conf.body);
         if (!heading && !body) return '';
         return `
           <article class="detail-entry">
-            ${heading ? `<div class="detail-entry-head"><span class="detail-entry-title">${escapeHtml(heading)}</span>${item.type ? `<span class="detail-entry-badge">${escapeHtml(item.type)}</span>` : ''}</div>` : ''}
+            ${heading || badge
+              ? `<div class="detail-entry-head"><span class="detail-entry-title">${escapeHtml(heading)}</span>${badge ? `<span class="detail-entry-badge">${escapeHtml(badge)}</span>` : ''}</div>`
+              : ''}
             ${body ? `<div class="detail-entry-body">${escapeHtml(body)}</div>` : ''}
           </article>
         `;
@@ -200,11 +199,11 @@ export function renderKeyValueSection(title, items) {
   `;
 }
 
-export function renderImageSection(title, images) {
+export function renderImageSection(title, images, imageField) {
   if (!Array.isArray(images) || !images.length) return '';
   const cards = images
     .map((item) => {
-      const url = upgradeImageUrl(pickImageUrl(item));
+      const url = upgradeImageUrl(pickImageUrl(item, imageField));
       if (!url) return '';
       const desc = item?.description || title;
       return `
@@ -221,14 +220,14 @@ export function renderImageSection(title, images) {
   return cards ? `<section class="detail-section" data-section="${escapeHtml(title)}"><h2>${escapeHtml(title)}</h2><div class="detail-image-grid">${cards}</div></section>` : '';
 }
 
-export function renderGifs(gifs) {
+export function renderGifs(gifs, imageField) {
   if (!Array.isArray(gifs) || !gifs.length) return '';
   return `
     <section class="detail-section" data-section="动作">
       <h2>动作</h2>
       <div class="detail-image-grid">
         ${gifs.map((item) => {
-          const url = upgradeImageUrl(pickImageUrl(item));
+          const url = upgradeImageUrl(pickImageUrl(item, imageField));
           if (!url) return '';
           return `
             <figure class="detail-image-item">
@@ -318,32 +317,11 @@ function flattenKeyValueItems(items) {
   return result;
 }
 
-function pickLocalizedMap(data, field, lang) {
+function pickLocalizedMap(data, field, lang, blockKey) {
   const block = data?.[field];
   if (!block || typeof block !== 'object') return [];
-  const preferred = block[`${field}_${lang}`];
-  if (Array.isArray(preferred) && preferred.length) return preferred;
-  const zh = block[`${field}_zh`];
-  if (Array.isArray(zh) && zh.length) return zh;
-  const en = block[`${field}_en`];
-  if (Array.isArray(en) && en.length) return en;
-  return [];
-}
-
-/** 组合型区块优先取原始值（多为数组），取不到再退回本地化块。 */
-function pickRawOrLocalized(data, field, lang) {
-  const raw = data?.[field];
-  if (Array.isArray(raw) || (raw && typeof raw === 'object')) return raw;
-  return pickLocalizedRaw(data, field, lang);
-}
-
-function pickStoryList(data, lang) {
-  const stories = data?.storys;
-  if (!stories || typeof stories !== 'object') return [];
-  const candidates = [stories[`story_${lang}`], stories.story_zh, stories.story_en];
-  return candidates.find((item) => Array.isArray(item) && item.length)
-    || candidates.find(Array.isArray)
-    || [];
+  const value = block[`${blockKey || field}_${lang}`];
+  return Array.isArray(value) ? value : [];
 }
 
 function excerpt(text, maxLength) {
@@ -359,17 +337,15 @@ function excerpt(text, maxLength) {
  * 这样不同业务的字段命名差异被 profile 吸收，渲染器保持业务无关。
  */
 
-const DEFAULT_ENTRY_MAP = {
-  heading: ['title', 'name'],
-  badge: ['badge', 'type'],
-  body: ['content', 'text', 'description']
-};
+const DEFAULT_TITLED_MAP = { heading: 'title', badge: 'type', body: 'content' };
 
-const DEFAULT_AUDIO_MAP = { heading: ['title', 'name', 'scene'], urls: ['urls', 'voices'] };
+const DEFAULT_ENTRY_MAP = { heading: 'title', badge: 'type', body: 'content' };
+
+const DEFAULT_AUDIO_MAP = { heading: 'title', urls: 'urls' };
 
 const DEFAULT_DIALOGUE_MAP = {
   groups: 'chapters',
-  heading: ['title', 'group'],
+  heading: 'title',
   lines: 'lines',
   speaker: 'speaker',
   text: 'text',
@@ -377,7 +353,10 @@ const DEFAULT_DIALOGUE_MAP = {
   note: 'note'
 };
 
-/** 从一个条目里按映射取若干字段，拼接成字符串（支持多字段 fallback）。 */
+/**
+ * 按映射取字段值拼成字符串。
+ * key 为数组时表示**组合**（如技能名 = 名称 + 额外名），不是"取第一个有值的"。
+ */
 function pickMapped(item, keys) {
   const list = Array.isArray(keys) ? keys : keys ? [keys] : [];
   return list
@@ -388,14 +367,9 @@ function pickMapped(item, keys) {
     .trim();
 }
 
-/** 从一个条目里按映射取列表字段（支持多字段 fallback）。 */
-function pickMappedList(item, keys) {
-  const list = Array.isArray(keys) ? keys : keys ? [keys] : [];
-  for (const key of list) {
-    const value = asArray(item?.[key]);
-    if (value.length) return value;
-  }
-  return [];
+/** 按映射取列表字段，字段名唯一。 */
+function pickMappedList(item, key) {
+  return asArray(item?.[key]);
 }
 
 function asArray(value) {
