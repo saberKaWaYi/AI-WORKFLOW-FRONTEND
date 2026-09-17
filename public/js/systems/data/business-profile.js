@@ -92,13 +92,17 @@ export const BUSINESS_PROFILES = {
     label: 'PCR 角色',
     relatedTitle: '相关角色',
     noRelated: '暂无相关角色',
-    // 字段均为 {字段_zh} 扁平本地化块，pickLocalized 可直接消费
+    // metaFields 第三项是可选声明：`{ lang }` 读指定语言（pcr 的 name 块里有 name_ja / name_kana），
+    // `{ blockKey }` 处理块内键名与字段名不一致。不填就是读当前语言的 `{字段_zh}`。
     metaFields: [
+      ['name', '日文名', { lang: 'ja' }],
+      ['name', '假名', { lang: 'kana' }],
       ['race', '种族'],
       ['guild', '公会'],
       ['element', '属性'],
       ['position', '定位'],
       ['attack_type', '攻击类型'],
+      ['attributes', '综合标签'],
       ['base_character', '基准角色'],
       ['height', '身高'],
       ['weight', '体重'],
@@ -109,19 +113,17 @@ export const BUSINESS_PROFILES = {
     ],
     heroSubFields: ['full_name'],
     // 头像在 avatars[{url}] 数组里（无 *_en，日文当中文）
-    heroImage: { source: 'avatars' },
+    heroImage: { source: 'avatars', imageField: 'url' },
     sectionNav: true,
-    // 不展示但必须声明：写在这里是显式决定，不写会被契约校验判为"profile 漏配"
-    hiddenFields: [
-      'nicknames',
-      // 与 metaFields 的 定位 / 攻击类型 / 属性 三项重复
-      'attributes'
-    ],
+    // mongo 文档的每个字段都必须落到这里（显示或 hiddenFields 显式声明），一个都不能静默丢弃
     // 结构差异全部落在 map 里：渲染器只认 heading/body/badge 这类角色，不认业务字段名
     sections: [
       { field: 'introduction', title: '介绍', type: 'text' },
+      { field: 'nicknames', title: '昵称', type: 'text-list' },
+      // initial_star 是全库唯一的裸标量（数字），没有语言外层
+      { field: 'initial_star', title: '初始星级', type: 'text', raw: true },
       // raw: true —— 该字段直接存数组 / 对象，不是 `{字段_zh}` 本地化块
-      { field: 'equipment', title: '装备', type: 'entry-list', raw: true, map: { heading: 'name_zh', body: 'description_zh' } },
+      { field: 'equipment', title: '装备', type: 'kv-raw', raw: true, labels: { name_zh: '名称', description_zh: '描述' } },
       {
         field: 'skills',
         title: '技能',
@@ -130,9 +132,11 @@ export const BUSINESS_PROFILES = {
         map: {
           heading: ['name_zh', 'name_extra'],
           badge: 'slot',
+          image: 'icon',
           body: 'description',
           extra: ['upgraded_name_zh', 'upgraded_description'],
           extraLabel: '升级后',
+          audio: 'voices',
           ordinal: true,
           variant: 'detail-entry-skill'
         }
@@ -142,7 +146,7 @@ export const BUSINESS_PROFILES = {
         title: '羁绊',
         type: 'entry-list',
         raw: true,
-        map: { icon: '♥', heading: 'level', headingPrefix: 'Lv.', body: 'effect', variant: 'detail-entry-bond' }
+        map: { icon: '♥', heading: 'level', headingPrefix: 'Lv.', body: 'effect', audio: 'voices', variant: 'detail-entry-bond' }
       },
       { field: 'other_voices', title: '语音', type: 'audio-list', raw: true, map: { heading: 'scene', urls: 'voices' } },
       {
@@ -166,8 +170,27 @@ export const BUSINESS_PROFILES = {
         title: '剧情台词',
         type: 'dialogue-list',
         raw: true,
-        map: { heading: 'group', lines: 'lines', lineIndex: true, icon: '❖', variant: 'detail-entry-group' }
-      }
+        map: {
+          heading: 'group',
+          lines: 'lines',
+          groupAudio: 'group_voices',
+          lineIndex: true,
+          icon: '❖',
+          variant: 'detail-entry-group'
+        }
+      },
+      { field: 'avatars', title: '头像', type: 'image-list', imageField: 'url' },
+      { field: 'portrait', title: '肖像', type: 'image-list', imageField: 'url', captionField: 'tab' },
+      { field: 'artwork', title: '立绘', type: 'image-list', imageField: 'url', captionField: 'tab' },
+      // ub_animations 是 `{ub, ub_6star}` 对象而非数组，labels 给两个键配中文说明
+      {
+        field: 'ub_animations',
+        title: 'UB 动画',
+        type: 'image-map',
+        raw: true,
+        labels: { ub: 'UB', ub_6star: '6 星 UB' }
+      },
+      { field: 'url', title: '资料页', type: 'link', raw: true }
     ],
     // 额外挂了一张独立的剧情 mongo 表，属数据层差异，用开关声明而非在视图里写死业务名
     storyModule: true,
@@ -287,8 +310,10 @@ export function checkMongoContract(profile, data, lang) {
     );
   }
 
-  const expectBlock = (field, where, blockKey) => {
+  const expectBlock = (field, where, blockKey, blockLang) => {
     const key = blockKey || field;
+    // 声明指定了语言时按该语言校验（如 pcr 的日文名），否则按当前语言
+    const checkLang = blockLang || lang;
     const block = data[field];
     checker.expect(
       block !== undefined,
@@ -301,12 +326,14 @@ export function checkMongoContract(profile, data, lang) {
     );
     if (isPlaceholder) return;
     checker.expect(
-      block?.[`${key}_${lang}`] !== undefined,
-      SCOPE.MONGO, subject, `${key}_${lang}`, '缺少当前语言的值'
+      block?.[`${key}_${checkLang}`] !== undefined,
+      SCOPE.MONGO, subject, `${key}_${checkLang}`, `缺少 ${checkLang} 的值`
     );
   };
 
-  (profile.metaFields || []).forEach(([field, , blockKey]) => expectBlock(field, 'metaFields', blockKey));
+  (profile.metaFields || []).forEach(([field, , options]) => {
+    expectBlock(field, 'metaFields', options?.blockKey, options?.lang);
+  });
   (profile.heroSubFields || []).forEach((field) => expectBlock(field, 'heroSubFields'));
   (profile.sections || []).forEach((section) => {
     if (section.optional) return;

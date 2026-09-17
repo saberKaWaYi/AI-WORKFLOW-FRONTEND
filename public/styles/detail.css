@@ -545,6 +545,19 @@
   flex: 0 0 auto;
 }
 
+/* 图标位放真实图片时（如技能图标），沿用同一尺寸 */
+.detail-entry-icon-image {
+  overflow: hidden;
+  background: transparent;
+}
+
+.detail-entry-icon-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
 .detail-entry-skill .detail-entry-badge {
   background: color-mix(in srgb, var(--detail-accent), var(--panel) 80%);
   border-color: color-mix(in srgb, var(--detail-accent), var(--line) 35%);

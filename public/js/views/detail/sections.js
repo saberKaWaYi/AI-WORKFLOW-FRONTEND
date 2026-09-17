@@ -41,8 +41,8 @@ export function ensureVoiceLanguage(voice) {
 
 export function renderMetaSection(profile, data, lang) {
   const items = (profile.metaFields || [])
-    .map(([field, label, blockKey]) => {
-      const value = pickLocalized(data, field, lang, blockKey);
+    .map(([field, label, options]) => {
+      const value = pickLocalized(data, field, options?.lang || lang, options?.blockKey);
       return value
         ? `<div class="detail-meta-item"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`
         : '';
@@ -63,19 +63,26 @@ export function renderSection(section, data, lang) {
 
   switch (type) {
     case 'text':
-      return renderTextSection(title, pickLocalized(data, field, lang, blockKey));
+      return renderTextSection(title, pickTextValue(data, section, lang));
     case 'text-list':
       return renderListSection(title, pickLocalizedList(data, field, lang, blockKey));
     case 'kv-list':
       return renderKeyValueSection(title, pickLocalizedMap(data, field, lang, blockKey));
     case 'kv-object':
       return renderObjectSection(title, pickLocalizedObject(data, field, lang, blockKey), section.labels);
+    // kv-raw：字段本身就是 `{键: 值}` 对象（无语言外层），键名经 labels 翻译成中文
+    case 'kv-raw':
+      return renderObjectSection(title, pickSectionValue(data, section, lang), section.labels);
     case 'titled-list':
       return renderTitledListSection(title, pickLocalizedList(data, field, lang, blockKey), section.map);
     case 'image-list':
-      return renderImageSection(title, data[field], section.imageField);
+      return renderImageSection(title, data[field], section.imageField, section.captionField);
     case 'gif-list':
-      return renderGifs(data[field], section.imageField);
+      return renderGifs(data[field], section.imageField, section.captionField);
+    case 'image-map':
+      return renderImageMapSection(title, pickSectionValue(data, section, lang), section.labels);
+    case 'link':
+      return renderLinkSection(title, pickTextValue(data, section, lang));
     case 'voice': {
       const voiceList = Array.isArray(data[field]) ? data[field] : [];
       return renderVoice(voiceList, ensureVoiceLanguage(voiceList));
@@ -89,6 +96,15 @@ export function renderSection(section, data, lang) {
     default:
       throw new Error(`区块 ${field} 声明了未知渲染类型 "${type}"，请在 business-profile 里写明`);
   }
+}
+
+/**
+ * 取文本型区块的值：raw 读原始字符串，其余读 `{字段_zh}` 本地化块。
+ * 由 profile 显式声明，不靠运行时试探。
+ */
+function pickTextValue(data, section, lang) {
+  if (section.raw) return data?.[section.field] ?? '';
+  return pickLocalized(data, section.field, lang, section.blockKey);
 }
 
 /**
@@ -199,13 +215,13 @@ export function renderKeyValueSection(title, items) {
   `;
 }
 
-export function renderImageSection(title, images, imageField) {
+export function renderImageSection(title, images, imageField, captionField) {
   if (!Array.isArray(images) || !images.length) return '';
   const cards = images
     .map((item) => {
       const url = upgradeImageUrl(pickImageUrl(item, imageField));
       if (!url) return '';
-      const desc = item?.description || title;
+      const desc = pickCaption(item, captionField) || title;
       return `
         <figure class="detail-image-item">
           <div class="detail-image-frame">
@@ -220,7 +236,36 @@ export function renderImageSection(title, images, imageField) {
   return cards ? `<section class="detail-section" data-section="${escapeHtml(title)}"><h2>${escapeHtml(title)}</h2><div class="detail-image-grid">${cards}</div></section>` : '';
 }
 
-export function renderGifs(gifs, imageField) {
+/**
+ * image-map：`{键: 图片地址}` 形式的对象。转为图片条目后复用 image-list 的渲染，
+ * 因此两者外观完全一致；键名经 labels 翻译成中文说明（未声明则原样显示）。
+ */
+export function renderImageMapSection(title, entries, labels) {
+  if (!entries || typeof entries !== 'object' || Array.isArray(entries)) return '';
+  const items = Object.entries(entries)
+    .filter(([, value]) => typeof value === 'string' && value)
+    .map(([key, url]) => ({ url, caption: labels?.[key] || key }));
+  if (!items.length) return '';
+  return renderImageSection(title, items, 'url', 'caption');
+}
+
+/** link：外部链接，沿用 detail-text 的文字样式。 */
+export function renderLinkSection(title, href) {
+  if (!href) return '';
+  return `
+    <section class="detail-section" data-section="${escapeHtml(title)}">
+      <h2>${escapeHtml(title)}</h2>
+      <div class="detail-text"><a href="${escapeHtml(href)}" target="_blank" rel="noopener">${escapeHtml(href)}</a></div>
+    </section>
+  `;
+}
+
+/** 图片说明：优先 profile 指定的字段，其次条目自带的 description。 */
+function pickCaption(item, captionField) {
+  return (captionField ? item?.[captionField] : '') || item?.description || '';
+}
+
+export function renderGifs(gifs, imageField, captionField) {
   if (!Array.isArray(gifs) || !gifs.length) return '';
   return `
     <section class="detail-section" data-section="动作">
@@ -229,12 +274,13 @@ export function renderGifs(gifs, imageField) {
         ${gifs.map((item) => {
           const url = upgradeImageUrl(pickImageUrl(item, imageField));
           if (!url) return '';
+          const desc = pickCaption(item, captionField);
           return `
             <figure class="detail-image-item">
               <div class="detail-image-frame">
-                <img src="${escapeHtml(url)}" alt="${escapeHtml(item.description || '')}" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+                <img src="${escapeHtml(url)}" alt="${escapeHtml(desc)}" loading="lazy" decoding="async" referrerpolicy="no-referrer">
               </div>
-              ${item.description ? `<figcaption>${escapeHtml(excerpt(item.description, 72))}</figcaption>` : ''}
+              ${desc ? `<figcaption>${escapeHtml(excerpt(desc, 72))}</figcaption>` : ''}
             </figure>
           `;
         }).filter(Boolean).join('')}
@@ -391,13 +437,17 @@ export function renderEntryListSection(title, items, map) {
       const badge = pickMapped(item, conf.badge);
       const body = pickMapped(item, conf.body);
       const extra = pickMapped(item, conf.extra);
-      if (!heading && !body && !extra) return '';
+      const image = upgradeImageUrl(pickMapped(item, conf.image));
+      const audios = pickMappedList(item, conf.audio).filter((url) => typeof url === 'string' && url);
+      if (!heading && !body && !extra && !image && !audios.length) return '';
       const prefix = conf.headingPrefix || '';
-      const iconMark = conf.icon
-        ? `<span class="detail-entry-icon">${escapeHtml(conf.icon)}</span>`
-        : conf.ordinal
-          ? `<span class="detail-entry-icon">${index + 1}</span>`
-          : '';
+      const iconMark = image
+        ? `<span class="detail-entry-icon detail-entry-icon-image"><img src="${escapeHtml(image)}" alt="" loading="lazy" referrerpolicy="no-referrer"></span>`
+        : conf.icon
+          ? `<span class="detail-entry-icon">${escapeHtml(conf.icon)}</span>`
+          : conf.ordinal
+            ? `<span class="detail-entry-icon">${index + 1}</span>`
+            : '';
       return `
         <article class="detail-entry${conf.variant ? ` ${conf.variant}` : ''}">
           ${heading || badge
@@ -407,6 +457,7 @@ export function renderEntryListSection(title, items, map) {
           ${extra
             ? `<div class="detail-entry-body detail-entry-extra">${conf.extraLabel ? `<strong>${escapeHtml(conf.extraLabel)}</strong>` : ''}${escapeHtml(extra)}</div>`
             : ''}
+          ${audios.length ? renderAudioStack(audios) : ''}
         </article>`;
     })
     .filter(Boolean)
@@ -418,6 +469,18 @@ export function renderEntryListSection(title, items, map) {
       <div class="detail-entry-list">${cards}</div>
     </section>
   `;
+}
+
+/** 音频列表。audio-list 与 entry-list 共用，保证播放器外观一致。 */
+function renderAudioStack(urls) {
+  return `
+    <div class="detail-audio-stack">
+      ${urls.map((url, i) => `
+        <div class="detail-audio-item">
+          <span class="detail-audio-index">${i + 1}</span>
+          <audio controls preload="none" src="${escapeHtml(url)}"></audio>
+        </div>`).join('')}
+    </div>`;
 }
 
 /** audio-list：分组音频列表。map: { heading, urls } */
@@ -434,13 +497,7 @@ export function renderAudioListSection(title, items, map) {
       return `
         <article class="detail-entry detail-audio-card">
           ${heading ? `<div class="detail-entry-head"><span class="detail-entry-title detail-audio-scene">${escapeHtml(heading)}</span></div>` : ''}
-          <div class="detail-audio-stack">
-            ${urls.map((url, i) => `
-              <div class="detail-audio-item">
-                <span class="detail-audio-index">${i + 1}</span>
-                <audio controls preload="none" src="${escapeHtml(url)}"></audio>
-              </div>`).join('')}
-          </div>
+          ${renderAudioStack(urls)}
         </article>`;
     })
     .filter(Boolean)
@@ -470,7 +527,8 @@ export function renderDialogueListSection(title, items, map) {
       if (!group || typeof group !== 'object') return '';
       const heading = pickMapped(group, conf.heading);
       const lines = asArray(group?.[conf.lines]);
-      if (!heading && !lines.length) return '';
+      const groupAudios = pickMappedList(group, conf.groupAudio).filter((url) => typeof url === 'string' && url);
+      if (!heading && !lines.length && !groupAudios.length) return '';
       const lineHtml = lines
         .map((line, index) => {
           if (!line || typeof line !== 'object') return '';
@@ -494,6 +552,7 @@ export function renderDialogueListSection(title, items, map) {
       return `
         <article class="detail-entry${conf.variant ? ` ${conf.variant}` : ''}">
           ${heading ? `<div class="detail-entry-head">${iconMark}<span class="detail-entry-title">${escapeHtml(heading)}</span></div>` : ''}
+          ${groupAudios.length ? renderAudioStack(groupAudios) : ''}
           <div class="detail-dialogue">${lineHtml || '<p class="detail-muted">（暂无台词文本）</p>'}</div>
         </article>`;
     })
