@@ -84,6 +84,13 @@ app.get("/api/nodes/semantic-search", (req, res) => {
   return proxy(url, res, Math.max(collectorTimeoutMs, 300000));
 });
 
+// 语义搜索已改为异步：上面的接口只领任务号，结果凭它到这里轮询。
+app.get("/api/tasks/:messageId", (req, res) => {
+  const { messageId } = req.params;
+  if (!messageId) return res.status(400).json({ message: "messageId is required" });
+  return proxy(`${collectorApi}/tasks/${encodeURIComponent(messageId)}`, res);
+});
+
 app.use("/api/auth", createAuthRouter({ sessionManager }));
 app.use("/api/admin", createAdminRouter({ sessionManager }));
 

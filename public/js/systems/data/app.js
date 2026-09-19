@@ -15,6 +15,12 @@ import { renderStoriesPage, renderStoryDetail } from '../../views/story-view.js'
 let dom = {};
 let currentRoute = { system: SYSTEM_IDS.DATA, page: 'main' };
 let semanticSearchBound = false;
+// 每次提交搜索自增一次。旧轮询发现令牌变了就自行退出，避免慢结果覆盖新搜索。
+let semanticSearchToken = 0;
+
+// 异步任务轮询参数：后端 task 服务每 5 秒捞一次，这里保持一致节奏。
+const SEMANTIC_POLL_INTERVAL_MS = 5000;
+const SEMANTIC_MAX_WAIT_MS = 300000;
 
 /** 数据系统所需的 DOM 元素，从完整 dom 集合中显式挑选，明确依赖范围。 */
 const DATA_DOM_KEYS = [
@@ -225,6 +231,9 @@ async function handleSemanticSearch(event) {
   const query = dom.semanticSearch?.value.trim() || '';
   if (!query || !state.dataSource || state.displayType !== DISPLAY_TYPES.CARDS) return;
 
+  // 本次搜索的令牌：期间若发起新搜索，本次结果作废。
+  const token = ++semanticSearchToken;
+
   state.semanticSearch = {
     businessName: state.dataSource,
     query,
@@ -239,19 +248,47 @@ async function handleSemanticSearch(event) {
 
   try {
     const params = new URLSearchParams({ business_name: state.dataSource, text: query });
-    const response = await api(`/api/nodes/semantic-search?${params}`);
-    state.semanticSearch.results = Array.isArray(response?.data) ? response.data : [];
+    // 后端已改为异步：这里只领一个任务号，真正的搜索在后台服务跑。
+    const submitted = await api(`/api/nodes/semantic-search?${params}`);
+    const messageId = submitted?.message_id;
+    if (!messageId) throw new Error('未能取得任务编号');
+    const results = await waitSemanticSearchResult(messageId, token);
+    if (token !== semanticSearchToken) return;
+    state.semanticSearch.results = results;
     state.semanticSearch.active = true;
   } catch (error) {
+    if (token !== semanticSearchToken) return;
     state.semanticSearch.error = error.message || '语义搜索失败';
   } finally {
+    if (token !== semanticSearchToken) return;
     state.semanticSearch.loading = false;
     syncSemanticSearchUi();
     renderDataPage();
   }
 }
 
+/** 凭任务号轮询结果：每 5 秒查一次，直到成功、失败或超时。
+ *
+ * 后端任务未落库时该接口会按 pending 返回（不报 404），所以这里无需处理首次查不到的情况。
+ */
+async function waitSemanticSearchResult(messageId, token) {
+  const startedAt = Date.now();
+
+  for (;;) {
+    if (token !== semanticSearchToken) return [];
+    if (Date.now() - startedAt > SEMANTIC_MAX_WAIT_MS) {
+      throw new Error('搜索任务超时，请稍后重试');
+    }
+    await new Promise((resolve) => setTimeout(resolve, SEMANTIC_POLL_INTERVAL_MS));
+    const task = await api(`/api/tasks/${encodeURIComponent(messageId)}`);
+    if (task?.status === 'success') return Array.isArray(task.result) ? task.result : [];
+    if (task?.status === 'failed') throw new Error(task.fail_reason || '搜索任务执行失败');
+  }
+}
+
 function resetSemanticSearch() {
+  // 令牌自增后，仍在轮询的旧任务会自行退出，避免清除后又冒出结果。
+  semanticSearchToken += 1;
   state.semanticSearch = {
     businessName: '',
     query: '',
@@ -272,7 +309,7 @@ function syncSemanticSearchUi() {
   dom.semanticClear?.classList.toggle('is-hidden', !state.semanticSearch.active && !state.semanticSearch.error);
   if (!dom.semanticStatus) return;
   if (state.semanticSearch.loading) {
-    dom.semanticStatus.textContent = '正在进行混合检索与重排序…';
+    dom.semanticStatus.textContent = '搜索任务已提交，正在后台检索…';
     dom.semanticStatus.classList.remove('is-error');
   } else if (state.semanticSearch.error) {
     dom.semanticStatus.textContent = state.semanticSearch.error;
