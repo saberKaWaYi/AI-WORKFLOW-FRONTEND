@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { Router } from "express";
-import { createUser, findUserById, findUserByLogin, parseStoredSystems, touchLastLogin } from "../db.js";
+import { createUser, findUserById, findUserByLogin, parseModelProviders, parseStoredSystems, touchLastLogin, updateUser } from "../db.js";
 import { ALL_SYSTEMS, DEFAULT_USER_SYSTEMS, ROLES, canAccess, cleanText, validateEmail, validateUsername } from "./roles.js";
 
 function parseEntrySystem(value) {
@@ -23,6 +23,28 @@ export function createAuthRouter({ sessionManager }) {
       }
     }
     res.json({ user: sessionManager.publicUser(session) });
+  });
+
+  // 当前登录用户读取/修改自己的模型供应商配置（model_providers）。
+  // 仅依赖会话身份，不碰他人数据；api-key 不进登录态 / /me，只在这两个接口收发。
+  router.get("/providers", async (req, res) => {
+    const session = await sessionManager.readSession(req);
+    if (!session?.userId) return res.status(401).json({ message: "未登录" });
+    const user = await findUserById(session.userId);
+    if (!user || user.deleted_at) return res.status(404).json({ message: "User not found" });
+    res.json({ modelProviders: parseModelProviders(user.model_providers) });
+  });
+
+  router.patch("/providers", async (req, res) => {
+    const session = await sessionManager.readSession(req);
+    if (!session?.userId) return res.status(401).json({ message: "未登录" });
+    const user = await findUserById(session.userId);
+    if (!user || user.deleted_at) return res.status(404).json({ message: "User not found" });
+    if (!Array.isArray(req.body?.modelProviders)) {
+      return res.status(400).json({ message: "modelProviders 必须是数组" });
+    }
+    const updated = await updateUser(session.userId, { modelProviders: req.body.modelProviders });
+    res.json({ modelProviders: parseModelProviders(updated.model_providers) });
   });
 
   router.post("/guest", async (req, res) => {

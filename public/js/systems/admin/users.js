@@ -1,6 +1,7 @@
 import { api } from '../../core/api.js';
 import { SYSTEM_IDS } from '../../core/constants.js';
 import { ALL_SYSTEMS, ASSIGNABLE_SYSTEMS, ROLE_LABELS, ROLES, SYSTEM_LABELS, isAdminUser } from '../../auth/portal.js';
+import { renderMyProvidersEditor } from '../account/providers.js';
 
 const SEARCH_FIELDS = [
   ['', '全部'],
@@ -384,6 +385,7 @@ export async function renderUsersPanel(container, currentUser) {
           <p>创建账号、分配系统访问权限，并管理账号状态。</p>
         </div>
       </header>
+      <section class="admin-card" data-my-providers-card></section>
       <section class="admin-card">
         <h2>创建用户</h2>
         <form class="admin-form" data-create-user-form autocomplete="off">
@@ -445,4 +447,7 @@ export async function renderUsersPanel(container, currentUser) {
   searchInput?.addEventListener('input', render);
   render();
   bindRowActions(container, currentUser);
+
+  const myProvidersCard = container.querySelector('[data-my-providers-card]');
+  if (myProvidersCard) await renderMyProvidersEditor(myProvidersCard);
 }

@@ -19,6 +19,28 @@ function parseJsonArray(value) {
   return parsed;
 }
 
+/**
+ * 解析并清洗 model_providers：list[dict]，每项为
+ * { provider: 文本模型供应商, domain: 供应商域名/URL, apiKey: 该域名对应的 key }。
+ * 非法输入统一降级为 []；要求 provider + domain 齐全才保留（缺 apiKey 也可，但不存空行）。
+ */
+export function parseModelProviders(value) {
+  let arr;
+  if (Array.isArray(value)) arr = value;
+  else if (typeof value === "string") {
+    try { arr = JSON.parse(value); } catch { return []; }
+  } else return [];
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .filter((item) => item && typeof item === "object")
+    .map((item) => ({
+      provider: String(item.provider ?? "").slice(0, 64).trim(),
+      domain: String(item.domain ?? "").slice(0, 512).trim(),
+      apiKey: String(item.apiKey ?? "").slice(0, 512)
+    }))
+    .filter((item) => item.provider && item.domain);
+}
+
 export function parseStoredSystems(user) {
   if (!user) return [];
   return parseJsonArray(user.allowed_systems);
@@ -57,6 +79,7 @@ export async function initSchema() {
       display_name VARCHAR(80) NOT NULL,
       role VARCHAR(32) NOT NULL DEFAULT 'user',
       allowed_systems JSON NOT NULL DEFAULT ('["data"]'),
+      model_providers JSON NOT NULL DEFAULT ('[]'),
       is_active TINYINT(1) NOT NULL DEFAULT 1,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -119,16 +142,17 @@ export async function listUsers() {
   return rows.map(serializeUserRow);
 }
 
-export async function createUser({ username, email, passwordHash, displayName, role = ROLES.USER, allowedSystems = ["data"] }) {
+export async function createUser({ username, email, passwordHash, displayName, role = ROLES.USER, allowedSystems = ["data"], modelProviders = [] }) {
   const systemsJson = JSON.stringify(normalizeSystemsForRole(role, allowedSystems));
+  const providersJson = JSON.stringify(parseModelProviders(modelProviders));
   const [result] = await pool.execute(
-    "INSERT INTO users (username, email, password_hash, display_name, role, allowed_systems) VALUES (?, ?, ?, ?, ?, ?)",
-    [username, email || null, passwordHash, displayName, role, systemsJson]
+    "INSERT INTO users (username, email, password_hash, display_name, role, allowed_systems, model_providers) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [username, email || null, passwordHash, displayName, role, systemsJson, providersJson]
   );
   return findUserById(result.insertId);
 }
 
-export async function updateUser(id, { username, role, allowedSystems, isActive, displayName, email }) {
+export async function updateUser(id, { username, role, allowedSystems, isActive, displayName, email, modelProviders }) {
   const fields = [];
   const values = [];
 
@@ -138,6 +162,7 @@ export async function updateUser(id, { username, role, allowedSystems, isActive,
   if (isActive !== undefined) { fields.push("is_active = ?"); values.push(isActive ? 1 : 0); }
   if (displayName !== undefined) { fields.push("display_name = ?"); values.push(displayName); }
   if (email !== undefined) { fields.push("email = ?"); values.push(email || null); }
+  if (modelProviders !== undefined) { fields.push("model_providers = ?"); values.push(JSON.stringify(parseModelProviders(modelProviders))); }
 
   if (!fields.length) return findUserById(id);
 
