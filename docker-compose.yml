@@ -6,6 +6,8 @@
       - "host.docker.internal:host-gateway"
     ports:
       - "3000:3000"
+    environment:
+      - TEXT_GENERATE_API_URL=${TEXT_GENERATE_API_URL:-http://text-generate:8001/api}
     networks:
       - ai-workflow-internal
     restart: unless-stopped

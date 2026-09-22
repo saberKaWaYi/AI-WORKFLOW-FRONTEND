@@ -31,7 +31,9 @@ const SHELL_DOM_MAPPING = {
     render: 'textRender',
     send: 'textSend',
     mention: 'textMention',
-    preview: 'textPreview'
+    preview: 'textPreview',
+    provider: 'textProvider',
+    model: 'textModel'
   },
   [SYSTEM_IDS.VIDEO]: {
     shell: 'videoShell',

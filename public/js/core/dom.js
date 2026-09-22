@@ -91,6 +91,8 @@ const ELEMENT_SELECTORS = {
   textSend: '[data-text-send]',
   textMention: '[data-text-mention]',
   textPreview: '[data-text-preview]',
+  textProvider: '[data-text-provider]',
+  textModel: '[data-text-model]',
 
   // 视频系统
   videoMain: '[data-video-main]',

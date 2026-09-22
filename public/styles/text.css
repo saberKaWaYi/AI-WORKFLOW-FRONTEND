@@ -185,3 +185,28 @@
 .text-mention-hint { flex: none; font-size: 12px; color: var(--muted); }
 .text-mention-empty { padding: 10px 12px; font-size: 13px; color: var(--muted); }
 
+/* ---------- 厂商 / 模型下拉框 ---------- */
+
+/* 与底部按钮同一行（都是 bottom: 14px 的绝对定位），排在 AI渲染 左侧。
+   宽度写死是为了让右侧按钮位置固定；窄屏下随输入框一起被裁切。 */
+.text-composer .text-select {
+  position: absolute;
+  bottom: 14px;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+}
+
+.text-composer .text-select:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent-text), var(--line) 55%); }
+.text-composer .text-select:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.text-composer [data-text-model] { right: 158px; width: 148px; }
+.text-composer [data-text-provider] { right: 314px; width: 116px; }
+

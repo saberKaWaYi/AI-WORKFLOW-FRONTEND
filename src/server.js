@@ -14,6 +14,7 @@ dotenv.config();
 const port = Number(process.env.APP_PORT || 3000);
 const collectorApi = (process.env.COLLECTOR_API_URL || "http://localhost:8000/api").replace(/\/+$/, "");
 const collectorTimeoutMs = Math.max(1000, Number(process.env.COLLECTOR_TIMEOUT_MS) || 15000);
+const textGenerateApi = (process.env.TEXT_GENERATE_API_URL || "http://localhost:8001/api").replace(/\/+$/, "");
 
 if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 16) {
   throw new Error("SESSION_SECRET must be at least 16 characters");
@@ -100,6 +101,21 @@ app.get("/api/tasks/:messageId", (req, res) => {
   const { messageId } = req.params;
   if (!messageId) return res.status(400).json({ message: "messageId is required" });
   return proxy(`${collectorApi}/tasks/${encodeURIComponent(messageId)}`, res);
+});
+
+// 文本系统作者模式：厂商 / 模型下拉框。
+// 数据由 TEXT-GENERATE 提供（它连 MySQL 读该用户的 model_providers、从自身配置读模型），
+// 本服务只按会话身份转发，不查询数据库。
+app.get("/api/text/providers", requireUser, async (req, res) => {
+  const session = await sessionManager.readSession(req);
+  const userId = session?.userId;
+  if (!userId) return res.status(401).json({ message: "请先登录后再访问数据" });
+  return proxy(`${textGenerateApi}/providers?${new URLSearchParams({ user_id: String(userId) })}`, res);
+});
+app.get("/api/text/models", requireUser, (req, res) => {
+  const { provider } = req.query;
+  if (!provider) return res.status(400).json({ message: "provider is required" });
+  return proxy(`${textGenerateApi}/models?${new URLSearchParams({ provider: String(provider) })}`, res);
 });
 
 app.use("/api/auth", createAuthRouter({ sessionManager }));
