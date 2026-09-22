@@ -49,6 +49,12 @@ export async function restoreConfigFromState() {
 
   await loadNetwork(state.dataSource);
 
+  // 跨系统跳转过来时没有历史语言选择，按数据自身能力给个默认值，
+  // 否则详情页拿不到 name_{lang}，落地是一片空。
+  if (!state.dataLanguage) {
+    state.dataLanguage = state.data.has_chinese ? LANGUAGES.ZH
+      : (state.data.has_english ? LANGUAGES.EN : '');
+  }
   if (state.dataLanguage) {
     dom.dataLanguage.value = state.dataLanguage;
     syncLanguageControls();

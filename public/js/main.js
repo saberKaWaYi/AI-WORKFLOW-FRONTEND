@@ -131,7 +131,9 @@ function renderSystem(systemId, route) {
 
   if (systemId === SYSTEM_IDS.DATA) {
     showElement(dom.dataShell);
-    bootDataApp().then(() => renderDataRoute(route || parseRoute()));
+    // 把 route 透传给 bootDataApp：跨系统跳转（?biz=）要先切好业务再渲染详情页。
+    const resolved = route || parseRoute();
+    bootDataApp(resolved).then(() => renderDataRoute(resolved));
     return;
   }
   renderShell(systemId);

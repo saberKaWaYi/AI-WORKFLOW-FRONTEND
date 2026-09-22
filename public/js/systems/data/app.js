@@ -1,4 +1,4 @@
-import { DATA_TEXT, state } from '../../core/state.js';
+import { DATA_TEXT, saveDataState, state } from '../../core/state.js';
 import { api } from '../../core/api.js';
 import { DETAIL_SOURCE_VIEWS, DISPLAY_TYPES, SYSTEM_IDS } from '../../core/constants.js';
 import { formatText } from '../../core/utils.js';
@@ -97,9 +97,30 @@ export function initDataApp(elements) {
   return loadBusinesses();
 }
 
-export async function bootDataApp() {
+/**
+ * 启动数据系统。
+ *
+ * `route.business` 是跨系统跳转带过来的目标业务（`?biz=`）。必须在
+ * `restoreConfigFromState()` **之前**落进 state，否则会用上一次的业务去加载网络，
+ * 详情页随后按错的 business_name 查库，必然查不到。
+ */
+export async function bootDataApp(route = {}) {
+  if (route.business && route.business !== state.dataSource) {
+    await applyBusiness(route.business);
+  }
   await restoreConfigFromState();
   renderDataPage();
+}
+
+/** 切换数据源。只置状态，网络加载与控件同步交给 restoreConfigFromState 统一做。 */
+async function applyBusiness(business) {
+  state.dataSource = business;
+  state.dataLanguage = '';
+  state.displayType = 'cards';
+  state.dataLoaded = false;
+  state.view = null;
+  state.filters.query = '';
+  saveDataState();
 }
 
 export function renderDataRoute(route) {

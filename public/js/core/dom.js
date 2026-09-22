@@ -81,6 +81,16 @@ const ELEMENT_SELECTORS = {
   textTitle: '[data-text-title]',
   textSubtitle: '[data-text-subtitle]',
   textGreeting: '[data-text-greeting]',
+  textMode: '[data-text-mode]',
+  textReader: '[data-text-reader]',
+  textAuthor: '[data-text-author]',
+  textThread: '[data-text-thread]',
+  textComposer: '[data-text-composer]',
+  textInput: '[data-text-input]',
+  textRender: '[data-text-render]',
+  textSend: '[data-text-send]',
+  textMention: '[data-text-mention]',
+  textPreview: '[data-text-preview]',
 
   // 视频系统
   videoMain: '[data-video-main]',

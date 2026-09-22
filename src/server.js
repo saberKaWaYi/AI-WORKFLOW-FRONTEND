@@ -77,6 +77,17 @@ app.get("/api/nodes", (req, res) => {
   if (!business_name || !name) return res.status(400).json({ message: "business_name and name are required" });
   return proxy(`${collectorApi}/nodes?${new URLSearchParams({ business_name, name })}`, res);
 });
+// @ 引用：先用 /nodes/list 拿全量做初始下拉，用户输入后再走 /nodes/search 模糊过滤。
+app.get("/api/nodes/list", (req, res) => {
+  const { business_name } = req.query;
+  if (!business_name) return res.status(400).json({ message: "business_name is required" });
+  return proxy(`${collectorApi}/nodes/list?${new URLSearchParams({ business_name })}`, res);
+});
+app.get("/api/nodes/search", (req, res) => {
+  const { business_name, keyword } = req.query;
+  if (!business_name || !keyword) return res.status(400).json({ message: "business_name and keyword are required" });
+  return proxy(`${collectorApi}/nodes/search?${new URLSearchParams({ business_name, keyword })}`, res);
+});
 app.get("/api/nodes/semantic-search", (req, res) => {
   const { business_name, text } = req.query;
   if (!business_name || !text) return res.status(400).json({ message: "business_name and text are required" });

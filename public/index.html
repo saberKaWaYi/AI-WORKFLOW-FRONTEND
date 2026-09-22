@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="./styles/data.css" />
     <link rel="stylesheet" href="./styles/detail.css" />
     <link rel="stylesheet" href="./styles/admin.css" />
+    <link rel="stylesheet" href="./styles/text.css" />
   </head>
   <body>
     <div class="auth-flow theme-scope" data-theme-scope="auth">
@@ -259,11 +260,21 @@
               <strong data-text-title>文本AI任务链</strong>
               <span class="micro" data-text-subtitle>文本生成与编排工作流</span>
             </div>
+            <button class="icon-btn" type="button" data-sidebar-toggle title="收放侧边栏">☰</button>
           </div>
           <div class="panel-section">
             <button class="theme-icon-btn" type="button" data-theme-toggle title="切换主题">
               <span data-theme-icon>☀</span>
             </button>
+          </div>
+          <div class="panel-section">
+            <label class="field">
+              <span>模式</span>
+              <select data-text-mode>
+                <option value="reader">读者模式</option>
+                <option value="author">作者模式</option>
+              </select>
+            </label>
           </div>
           <div class="panel-section sidebar-greeting">
             <p data-text-greeting></p>
@@ -272,10 +283,22 @@
             <button class="theme-btn" type="button" data-logout>退出登录</button>
           </div>
         </aside>
-        <main class="main">
-          <div class="dev-page" data-text-main>
+        <main class="main" data-text-main>
+          <div class="dev-page" data-text-reader>
             <p class="dev-notice">还在开发中</p>
-            <p class="dev-desc">文本AI任务链功能即将上线</p>
+            <p class="dev-desc">读者模式功能即将上线</p>
+          </div>
+          <div class="text-author-page is-hidden" data-text-author>
+            <div class="text-thread" data-text-thread></div>
+            <form class="text-composer" data-text-composer>
+              <div class="text-preview is-hidden" data-text-preview></div>
+              <div class="text-mention-menu is-hidden" data-text-mention></div>
+              <textarea data-text-input rows="1" placeholder="说说你想写什么… 输入 @ 引用世界观或人物"></textarea>
+              <button class="ghost-btn" type="button" data-text-render data-tip="AI渲染" aria-label="AI渲染">
+                <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M9 1.5l1.6 5.4 5.4 1.6-5.4 1.6L9 15.5l-1.6-5.4L2 8.5l5.4-1.6z"/></svg>
+              </button>
+              <button class="primary-btn" type="submit" data-text-send>发送</button>
+            </form>
           </div>
         </main>
       </div>

@@ -21,7 +21,17 @@ const SHELL_DOM_MAPPING = {
     main: 'textMain',
     title: 'textTitle',
     subtitle: 'textSubtitle',
-    greeting: 'textGreeting'
+    greeting: 'textGreeting',
+    mode: 'textMode',
+    reader: 'textReader',
+    author: 'textAuthor',
+    thread: 'textThread',
+    composer: 'textComposer',
+    input: 'textInput',
+    render: 'textRender',
+    send: 'textSend',
+    mention: 'textMention',
+    preview: 'textPreview'
   },
   [SYSTEM_IDS.VIDEO]: {
     shell: 'videoShell',
@@ -97,7 +107,10 @@ function createShell(systemId, onRender) {
 }
 
 const shells = {
-  [SYSTEM_IDS.TEXT]: createShell(SYSTEM_IDS.TEXT),
+  [SYSTEM_IDS.TEXT]: createShell(SYSTEM_IDS.TEXT, async (shellDom) => {
+    const { initTextApp } = await import('./text/app.js');
+    await initTextApp(shellDom);
+  }),
   [SYSTEM_IDS.VIDEO]: createShell(SYSTEM_IDS.VIDEO),
   [SYSTEM_IDS.IMAGE]: createShell(SYSTEM_IDS.IMAGE),
   [SYSTEM_IDS.VOICE]: createShell(SYSTEM_IDS.VOICE),
