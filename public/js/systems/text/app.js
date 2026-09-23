@@ -2,7 +2,6 @@ import { setHidden } from '../../core/dom.js';
 import { api } from '../../core/api.js';
 import { initMention } from './mention.js';
 import { initPreview } from './preview.js';
-import { initRenderAction, syncEnabled } from './render-action.js';
 
 /**
  * 文本 AI 任务链入口。
@@ -22,6 +21,13 @@ const MODE = {
   AUTHOR: 'author'
 };
 
+// 生成模式：底部胶囊按钮的枚举值，点一下轮到下一个。
+// value 是将来传给 TEXT-GENERATE 的字段值，label 只负责显示在按钮上。
+const GEN_MODES = [
+  { value: 'outline', label: '大纲生成' },
+  { value: 'content', label: '正文生成' }
+];
+
 let dom = {};
 let inited = false;
 
@@ -32,12 +38,10 @@ export async function initTextApp(elements) {
 
   dom.mode?.addEventListener('change', () => applyMode(dom.mode.value));
   dom.composer?.addEventListener('submit', (event) => event.preventDefault());
-  // 「渲染」按钮的可用态要跟着输入内容走，挂在这里而不是塞进 preview.js。
-  dom.input?.addEventListener('input', syncEnabled);
   dom.provider?.addEventListener('change', () => loadModels());
   initMention(dom);
   initPreview(dom);
-  initRenderAction(dom);
+  bindGenMode();
 
   applyMode(dom.mode?.value || MODE.READER);
   await loadProviders();
@@ -97,4 +101,24 @@ async function loadModels() {
   } catch {
     fillOptions(select, [], '模型加载失败');
   }
+}
+
+/** 生成模式按钮：初始为大纲生成，每次点击轮到下一个枚举值。 */
+function bindGenMode() {
+  const button = dom.genMode;
+  if (!button) return;
+  button.addEventListener('click', () => {
+    const current = Number(button.dataset.genModeIndex || 0);
+    applyGenMode((current + 1) % GEN_MODES.length);
+  });
+  applyGenMode(0);
+}
+
+/** 当前枚举回写到 data-gen-mode —— 将来调后端直接读这个属性，不用反解按钮文字。 */
+function applyGenMode(index) {
+  const button = dom.genMode;
+  const mode = GEN_MODES[index];
+  button.dataset.genModeIndex = String(index);
+  button.dataset.genMode = mode.value;
+  button.textContent = mode.label;
 }

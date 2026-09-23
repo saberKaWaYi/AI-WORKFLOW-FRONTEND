@@ -91,33 +91,27 @@
   color: #fff;
 }
 
-/* AI渲染：正圆图标按钮，只有星芒没有文字，靠悬停提示说明用途。
+/* 生成模式：胶囊按钮。「大纲生成 / 正文生成」两个枚举值轮流切，按钮文字就是当前值。
    宽高都要显式给死 —— base.css 给 .ghost-btn 设了 min-height: 42px，
-   只写 height 会被它顶成椭圆，必须把 min-height 一起压掉。 */
+   只写 height 会被它顶成椭圆，必须把 min-height 一起压掉。
+   宽度写死是为了让发送按钮位置固定；窄屏下随输入框一起被裁切。 */
 .text-composer .ghost-btn {
-  right: 108px;
-  width: 42px;
+  right: 98px;
+  width: 96px;
   height: 42px;
   min-height: 0;
-  padding: 0;
-  border-radius: 50%;
+  padding: 0 14px;
+  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-color: color-mix(in srgb, var(--accent-text), var(--line) 55%);
   background: color-mix(in srgb, var(--accent-text), var(--panel-strong) 92%);
   color: var(--accent-text);
+  cursor: pointer;
 }
 
-.text-composer .ghost-btn svg {
-  width: 18px;
-  height: 18px;
-  fill: currentColor;
-}
-
-.text-composer .ghost-btn:hover:not(:disabled) { filter: brightness(1.15); }
-
-.text-composer .ghost-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.text-composer .ghost-btn:hover { filter: brightness(1.15); }
 
 /* 悬停提示：用 data-tip 自绘，原生 title 太慢且样式不可控。 */
 .text-composer .ghost-btn[data-tip]::after {
@@ -138,14 +132,6 @@
 }
 
 .text-composer .ghost-btn[data-tip]:hover::after { opacity: 1; }
-
-/* 忙碌时按钮转圈，替代原来的「渲染中…」文案。 */
-.text-composer .ghost-btn.is-busy svg { animation: text-render-spin 900ms linear infinite; }
-
-@keyframes text-render-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
 
 /* ---------- @ 引用下拉 ---------- */
 
@@ -187,7 +173,7 @@
 
 /* ---------- 厂商 / 模型下拉框 ---------- */
 
-/* 与底部按钮同一行（都是 bottom: 14px 的绝对定位），排在 AI渲染 左侧。
+/* 与底部按钮同一行（都是 bottom: 14px 的绝对定位），排在生成模式按钮左侧。
    宽度写死是为了让右侧按钮位置固定；窄屏下随输入框一起被裁切。 */
 .text-composer .text-select {
   position: absolute;
@@ -207,6 +193,6 @@
 .text-composer .text-select:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent-text), var(--line) 55%); }
 .text-composer .text-select:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.text-composer [data-text-model] { right: 158px; width: 148px; }
-.text-composer [data-text-provider] { right: 314px; width: 116px; }
+.text-composer [data-text-model] { right: 202px; width: 148px; }
+.text-composer [data-text-provider] { right: 358px; width: 116px; }
 

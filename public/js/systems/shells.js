@@ -28,7 +28,7 @@ const SHELL_DOM_MAPPING = {
     thread: 'textThread',
     composer: 'textComposer',
     input: 'textInput',
-    render: 'textRender',
+    genMode: 'textGenMode',
     send: 'textSend',
     mention: 'textMention',
     preview: 'textPreview',

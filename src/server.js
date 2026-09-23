@@ -72,24 +72,24 @@ async function requireUser(req, res, next) {
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.get("/api/businesses", requireUser, (_req, res) => proxy(`${collectorApi}/businesses`, res));
-app.get("/api/network/:business", (req, res) => proxy(`${collectorApi}/network/${encodeURIComponent(req.params.business)}`, res));
-app.get("/api/nodes", (req, res) => {
+app.get("/api/network/:business", requireUser, (req, res) => proxy(`${collectorApi}/network/${encodeURIComponent(req.params.business)}`, res));
+app.get("/api/nodes", requireUser, (req, res) => {
   const { business_name, name } = req.query;
   if (!business_name || !name) return res.status(400).json({ message: "business_name and name are required" });
   return proxy(`${collectorApi}/nodes?${new URLSearchParams({ business_name, name })}`, res);
 });
 // @ 引用：先用 /nodes/list 拿全量做初始下拉，用户输入后再走 /nodes/search 模糊过滤。
-app.get("/api/nodes/list", (req, res) => {
+app.get("/api/nodes/list", requireUser, (req, res) => {
   const { business_name } = req.query;
   if (!business_name) return res.status(400).json({ message: "business_name is required" });
   return proxy(`${collectorApi}/nodes/list?${new URLSearchParams({ business_name })}`, res);
 });
-app.get("/api/nodes/search", (req, res) => {
+app.get("/api/nodes/search", requireUser, (req, res) => {
   const { business_name, keyword } = req.query;
   if (!business_name || !keyword) return res.status(400).json({ message: "business_name and keyword are required" });
   return proxy(`${collectorApi}/nodes/search?${new URLSearchParams({ business_name, keyword })}`, res);
 });
-app.get("/api/nodes/semantic-search", (req, res) => {
+app.get("/api/nodes/semantic-search", requireUser, (req, res) => {
   const { business_name, text } = req.query;
   if (!business_name || !text) return res.status(400).json({ message: "business_name and text are required" });
   const url = `${collectorApi}/nodes/semantic-search?${new URLSearchParams({ business_name, text })}`;
@@ -97,7 +97,7 @@ app.get("/api/nodes/semantic-search", (req, res) => {
 });
 
 // 语义搜索已改为异步：上面的接口只领任务号，结果凭它到这里轮询。
-app.get("/api/tasks/:messageId", (req, res) => {
+app.get("/api/tasks/:messageId", requireUser, (req, res) => {
   const { messageId } = req.params;
   if (!messageId) return res.status(400).json({ message: "messageId is required" });
   return proxy(`${collectorApi}/tasks/${encodeURIComponent(messageId)}`, res);

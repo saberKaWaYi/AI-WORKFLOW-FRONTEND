@@ -87,7 +87,7 @@ const ELEMENT_SELECTORS = {
   textThread: '[data-text-thread]',
   textComposer: '[data-text-composer]',
   textInput: '[data-text-input]',
-  textRender: '[data-text-render]',
+  textGenMode: '[data-text-gen-mode]',
   textSend: '[data-text-send]',
   textMention: '[data-text-mention]',
   textPreview: '[data-text-preview]',
