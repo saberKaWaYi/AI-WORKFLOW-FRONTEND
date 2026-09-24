@@ -6,8 +6,10 @@
  *  - 从角色详情的剧情模块入口点进来（#/data/story/<key> 看单条）。
  *
  * 数据接口契约（按业务泛化，业务需在 profile 里声明 storyModule）：
- *  - GET /api/stories/{business}            -> { data: [ story, ... ] }
- *  - GET /api/stories/{business}/{key}      -> { data: story }
+ *  - GET /api/stories/{business}                       -> { data: [ story, ... ] }
+ *  - GET /api/stories/{business}/detail?key={key}      -> { data: story }
+ * story key 可能含 `/`（如「特别/情人节之战！…」），故详情走 query 传参而非路径段，
+ * 否则 key 会被当成路径分隔符，路由匹配失败。
  * 接口失败就是失败，明确报错，不用"尚未接入"把问题糊过去。
  *
  * 剧情文档的字段名由 profile.storyFields 声明（键为渲染角色，值为该业务的字段名），
@@ -190,7 +192,7 @@ export async function renderStoryDetail(container, business, key) {
 
   let story = null;
   try {
-    const res = await api(`/api/stories/${encodeURIComponent(business)}/${encodeURIComponent(key)}`);
+    const res = await api(`/api/stories/${encodeURIComponent(business)}/detail?key=${encodeURIComponent(key)}`);
     story = res?.data ?? null;
   } catch (error) {
     console.error(error);

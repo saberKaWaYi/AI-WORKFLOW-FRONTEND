@@ -96,6 +96,20 @@ app.get("/api/nodes/semantic-search", requireUser, (req, res) => {
   return proxy(url, res, Math.max(collectorTimeoutMs, 300000));
 });
 
+// 剧情表：独立于节点表的第二张 mongo 表（业务需在 profile 里声明 storyModule）。
+// 列表可带 ?character= 按角色中文名过滤；详情按 story key 取整篇（含 lines）。
+app.get("/api/stories/:business", requireUser, (req, res) => {
+  const { character } = req.query;
+  const query = character ? `?${new URLSearchParams({ character: String(character) })}` : "";
+  return proxy(`${collectorApi}/stories/${encodeURIComponent(req.params.business)}${query}`, res);
+});
+app.get("/api/stories/:business/detail", requireUser, (req, res) => {
+  const { key } = req.query;
+  if (!key) return res.status(400).json({ message: "key is required" });
+  const query = new URLSearchParams({ key: String(key) });
+  return proxy(`${collectorApi}/stories/${encodeURIComponent(req.params.business)}/detail?${query}`, res);
+});
+
 // 语义搜索已改为异步：上面的接口只领任务号，结果凭它到这里轮询。
 app.get("/api/tasks/:messageId", requireUser, (req, res) => {
   const { messageId } = req.params;
