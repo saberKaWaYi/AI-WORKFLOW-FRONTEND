@@ -71,8 +71,8 @@ export function createIndex() {
     nodeById: new Map(),
     nodeByKey: new Map(),
     degreeById: new Map(),
-    undirectedById: new Map(),
     outgoingById: new Map(),
+    incomingById: new Map(),
     relatedById: new Map()
   };
 }
@@ -84,8 +84,8 @@ export function rebuildIndexes(data, index) {
   index.nodeById = new Map(nodes.map((node) => [node.vid, node]));
   buildKeyLookup(nodes, index);
   index.degreeById = new Map(nodes.map((node) => [node.vid, createDegree()]));
-  index.undirectedById = new Map(nodes.map((node) => [node.vid, []]));
   index.outgoingById = new Map(nodes.map((node) => [node.vid, []]));
+  index.incomingById = new Map(nodes.map((node) => [node.vid, []]));
   index.relatedById = new Map(nodes.map((node) => [node.vid, []]));
 
   edges.forEach((edge) => {
@@ -100,14 +100,14 @@ export function rebuildIndexes(data, index) {
     index.degreeById.set(edge.source_vid, sourceDegree);
     index.degreeById.set(edge.target_vid, targetDegree);
 
-    index.undirectedById.get(edge.source_vid)?.push({ nodeId: edge.target_vid, edge });
-    index.undirectedById.get(edge.target_vid)?.push({ nodeId: edge.source_vid, edge });
     index.outgoingById.get(edge.source_vid)?.push({ nodeId: edge.target_vid, edge });
+    index.incomingById.get(edge.target_vid)?.push({ nodeId: edge.source_vid, edge });
 
     const sourceNode = index.nodeById.get(edge.source_vid);
     const targetNode = index.nodeById.get(edge.target_vid);
     if (sourceNode && targetNode) {
-      index.relatedById.get(edge.source_vid)?.push({ node: targetNode, edge });
+      index.relatedById.get(edge.source_vid)?.push({ node: targetNode, edge, direction: 'out' });
+      index.relatedById.get(edge.target_vid)?.push({ node: sourceNode, edge, direction: 'in' });
     }
   });
 }
@@ -169,7 +169,7 @@ function relatedEdgeKey({ edge }, lang) {
   return `${edge.source_vid}->${edge.target_vid}::${pickEdgeText(edge, lang)}`;
 }
 
-/** 汇总某节点的出边关联，同一对端点的多条关系合并为一组。 */
+/** 汇总某节点的关联关系（出边 + 入边），同一对端点的多条关系合并为一组。 */
 export function getRelatedNodes(index, nodeId, lang) {
   const groups = new Map();
 
@@ -184,7 +184,7 @@ export function getRelatedNodes(index, nodeId, lang) {
     const key = relatedEdgeKey(item, lang);
     if (!group.relationKeys.has(key)) {
       group.relationKeys.add(key);
-      group.relations.push({ edge: item.edge });
+      group.relations.push({ edge: item.edge, direction: item.direction });
     }
   }
 

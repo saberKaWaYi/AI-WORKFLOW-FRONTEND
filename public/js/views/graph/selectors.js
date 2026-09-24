@@ -14,7 +14,7 @@ export const EMPTY_PATH_SELECTION = Object.freeze({
 
 const INACTIVE_FOCUS = Object.freeze({ active: false, nodeIds: new Set() });
 
-/** 以指定节点为中心，按层数向外扩散，返回可达节点集合。 */
+/** 以指定节点为中心，沿有向边（出边）按层数向外扩散，返回可达节点集合。 */
 export function buildFocusSelection({ filters, index }) {
   const startId = filters.focusNodeId;
   if (!startId || !index.nodeById.has(startId)) return INACTIVE_FOCUS;
@@ -26,7 +26,7 @@ export function buildFocusSelection({ filters, index }) {
   while (queue.length) {
     const current = queue.shift();
     if (current.depth >= maxDepth) continue;
-    for (const next of index.undirectedById.get(current.nodeId) || []) {
+    for (const next of index.outgoingById.get(current.nodeId) || []) {
       if (nodeIds.has(next.nodeId)) continue;
       nodeIds.add(next.nodeId);
       queue.push({ nodeId: next.nodeId, depth: current.depth + 1 });
