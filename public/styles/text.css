@@ -19,6 +19,44 @@
   gap: 14px;
 }
 
+/* 会话流条目：上排角色名、下排正文。
+   正文用 pre-wrap —— 大纲是带换行的纯文本，不能被折叠成一行。 */
+.text-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-strong);
+}
+
+.text-msg.is-user {
+  border-color: color-mix(in srgb, var(--accent-text), var(--line) 60%);
+  background: color-mix(in srgb, var(--accent-text), transparent 92%);
+}
+
+.text-msg.is-error {
+  border-color: color-mix(in srgb, var(--danger), var(--line) 45%);
+}
+
+.text-msg.is-error .text-msg-body {
+  color: var(--danger);
+}
+
+.text-msg-role {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.text-msg-body {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .text-composer {
   flex: 1;
   min-height: 110px;

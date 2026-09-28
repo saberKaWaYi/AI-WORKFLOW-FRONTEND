@@ -39,21 +39,25 @@ app.use(express.static(path.join(path.dirname(fileURLToPath(import.meta.url)), "
   }
 }));
 
-async function proxy(url, res, timeoutMs = collectorTimeoutMs) {
+async function proxy(url, res, options = {}) {
+  const { timeoutMs = collectorTimeoutMs, method = "GET", body } = options;
   try {
     const headers = { Accept: "application/json" };
     // P1：向后端透传 API Key（调用方需配置 COLLECTOR_API_KEY 环境变量）
     const apiKey = process.env.COLLECTOR_API_KEY;
     if (apiKey) headers["X-API-Key"] = apiKey;
+    if (body != null) headers["Content-Type"] = "application/json";
     const response = await fetch(url, {
+      method,
       headers,
+      body: body == null ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(timeoutMs)
     });
-    const body = Buffer.from(await response.arrayBuffer());
+    const payload = Buffer.from(await response.arrayBuffer());
     res.status(response.status);
     res.setHeader("Content-Type", response.headers.get("content-type") || "application/json; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
-    return res.send(body);
+    return res.send(payload);
   } catch (error) {
     console.error("collector proxy failed", error);
     return res.status(502).json({ message: "Data service is temporarily unavailable" });
@@ -93,7 +97,7 @@ app.get("/api/nodes/semantic-search", requireUser, (req, res) => {
   const { business_name, text } = req.query;
   if (!business_name || !text) return res.status(400).json({ message: "business_name and text are required" });
   const url = `${collectorApi}/nodes/semantic-search?${new URLSearchParams({ business_name, text })}`;
-  return proxy(url, res, Math.max(collectorTimeoutMs, 300000));
+  return proxy(url, res, { timeoutMs: Math.max(collectorTimeoutMs, 300000) });
 });
 
 // 剧情表：独立于节点表的第二张 mongo 表（业务需在 profile 里声明 storyModule）。
@@ -130,6 +134,37 @@ app.get("/api/text/models", requireUser, (req, res) => {
   const { provider } = req.query;
   if (!provider) return res.status(400).json({ message: "provider is required" });
   return proxy(`${textGenerateApi}/models?${new URLSearchParams({ provider: String(provider) })}`, res);
+});
+
+// 提交一次生成。user_id 由会话注入、前端不传，避免替别人提交任务。
+// 生成是异步的（worker 消费子表），这里只返回 task_id，结果靠下面的查询接口轮询。
+app.post("/api/text/tasks", requireUser, async (req, res) => {
+  const session = await sessionManager.readSession(req);
+  const userId = session?.userId;
+  if (!userId) return res.status(401).json({ message: "请先登录后再访问数据" });
+
+  const { provider, model, gen_mode, draft_text } = req.body || {};
+  if (!provider || !model || !gen_mode || !draft_text) {
+    return res.status(400).json({ message: "provider, model, gen_mode and draft_text are required" });
+  }
+
+  return proxy(`${textGenerateApi}/text/tasks`, res, {
+    method: "POST",
+    body: { user_id: userId, provider, model, gen_mode, draft_text }
+  });
+});
+
+// 查询任务：user_id 由会话注入。TEXT-GENERATE 只返回本人的任务，
+// 别人的任务号会得到 404，与"任务不存在"不作区分。
+app.get("/api/text/tasks/:taskId", requireUser, async (req, res) => {
+  const session = await sessionManager.readSession(req);
+  const userId = session?.userId;
+  if (!userId) return res.status(401).json({ message: "请先登录后再访问数据" });
+
+  const { taskId } = req.params;
+  if (!taskId) return res.status(400).json({ message: "taskId is required" });
+  const query = new URLSearchParams({ user_id: String(userId) });
+  return proxy(`${textGenerateApi}/text/tasks/${encodeURIComponent(taskId)}?${query}`, res);
 });
 
 app.use("/api/auth", createAuthRouter({ sessionManager }));
