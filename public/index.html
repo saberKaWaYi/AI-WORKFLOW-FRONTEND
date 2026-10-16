@@ -256,18 +256,18 @@
       <div class="app-shell theme-scope shell-text is-hidden" data-app-shell data-theme-scope="text" data-shell="text">
         <aside class="sidebar sidebar-text">
           <div class="sidebar-top">
-            <div class="brand">
+            <div class="brand hide-when-collapsed">
               <strong data-text-title>文本AI任务链</strong>
               <span class="micro" data-text-subtitle>文本生成与编排工作流</span>
             </div>
             <button class="icon-btn" type="button" data-sidebar-toggle title="收放侧边栏">☰</button>
           </div>
-          <div class="panel-section">
+          <div class="panel-section hide-when-collapsed">
             <button class="theme-icon-btn" type="button" data-theme-toggle title="切换主题">
               <span data-theme-icon>☀</span>
             </button>
           </div>
-          <div class="panel-section">
+          <div class="panel-section hide-when-collapsed">
             <label class="field">
               <span>模式</span>
               <select data-text-mode>
@@ -276,7 +276,17 @@
               </select>
             </label>
           </div>
-          <div class="panel-section sidebar-greeting">
+          <div class="panel-section text-nav is-hidden hide-when-collapsed" data-text-author-nav>
+            <button class="text-nav-btn" type="button" data-text-nav="thread">会话</button>
+            <button class="text-nav-btn" type="button" data-text-nav="shelf">书架</button>
+          </div>
+          <div class="panel-section text-nav is-hidden hide-when-collapsed" data-text-novel-actions>
+            <span class="micro">小说操作</span>
+            <button class="text-nav-btn" type="button" data-text-novel-rename>修改名称</button>
+            <button class="text-nav-btn" type="button" data-text-novel-edit>编辑大纲</button>
+            <button class="text-nav-btn is-danger" type="button" data-text-novel-delete>删除</button>
+          </div>
+          <div class="panel-section sidebar-greeting hide-when-collapsed">
             <p data-text-greeting></p>
           </div>
           <div class="panel-section">
@@ -289,20 +299,51 @@
             <p class="dev-desc">读者模式功能即将上线</p>
           </div>
           <div class="text-author-page is-hidden" data-text-author>
-            <div class="text-thread" data-text-thread></div>
-            <form class="text-composer" data-text-composer>
-              <div class="text-preview is-hidden" data-text-preview></div>
-              <div class="text-mention-menu is-hidden" data-text-mention></div>
-              <textarea data-text-input rows="1" placeholder="说说你想写什么… 输入 @ 引用世界观或人物"></textarea>
-              <select class="text-select" data-text-provider aria-label="厂商">
-                <option value="">厂商</option>
-              </select>
-              <select class="text-select" data-text-model aria-label="模型">
-                <option value="">模型</option>
-              </select>
-              <button class="ghost-btn" type="button" data-text-gen-mode data-gen-mode="outline" data-tip="点击切换生成模式">大纲生成</button>
-              <button class="primary-btn" type="submit" data-text-send>发送</button>
-            </form>
+            <div class="text-thread-view is-hidden" data-text-thread-view>
+              <div class="text-thread" data-text-thread></div>
+              <form class="text-composer" data-text-composer>
+                <div class="text-preview is-hidden" data-text-preview></div>
+                <div class="text-mention-menu is-hidden" data-text-mention></div>
+                <textarea data-text-input rows="1" placeholder="说说你想写什么… 输入 @ 引用世界观或人物"></textarea>
+                <select class="text-select" data-text-provider aria-label="厂商">
+                  <option value="">厂商</option>
+                </select>
+                <select class="text-select" data-text-model aria-label="模型">
+                  <option value="">模型</option>
+                </select>
+                <button class="ghost-btn" type="button" data-text-gen-mode data-gen-mode="outline" data-tip="点击切换生成模式">大纲生成</button>
+                <button class="primary-btn" type="submit" data-text-send>发送</button>
+              </form>
+            </div>
+            <div class="text-shelf is-hidden" data-text-shelf>
+              <div class="text-shelf-toolbar">
+                <button class="ghost-btn" type="button" data-text-shelf-refresh>刷新</button>
+                <div class="text-shelf-pager">
+                  <button class="ghost-btn" type="button" data-text-shelf-prev>上一页</button>
+                  <span class="micro" data-text-shelf-page>第 1 页</span>
+                  <button class="ghost-btn" type="button" data-text-shelf-next>下一页</button>
+                </div>
+              </div>
+              <div class="text-shelf-list" data-text-shelf-list></div>
+            </div>
+            <div class="text-novel-detail is-hidden" data-text-novel-detail>
+              <div class="text-novel-toolbar">
+                <button class="ghost-btn" type="button" data-text-novel-back>← 返回书架</button>
+              </div>
+              <h2 class="text-novel-title" data-text-novel-title></h2>
+              <p class="micro" data-text-novel-meta></p>
+              <form class="text-inline-form is-hidden" data-text-novel-rename-form>
+                <input class="text-inline-input" type="text" data-text-novel-title-input maxlength="60" placeholder="新的小说名称">
+                <button class="primary-btn" type="submit">保存</button>
+              </form>
+              <form class="text-inline-form is-hidden" data-text-novel-outline-form>
+                <textarea class="text-outline-input" rows="16" data-text-novel-outline-input spellcheck="false"></textarea>
+                <div class="text-inline-actions">
+                  <button class="primary-btn" type="submit">保存大纲</button>
+                </div>
+              </form>
+              <div class="text-md" data-text-novel-outline></div>
+            </div>
           </div>
         </main>
       </div>

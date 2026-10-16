@@ -1,5 +1,6 @@
 import { setHidden } from '../../core/dom.js';
 import { api } from '../../core/api.js';
+import { escapeHtml } from '../../core/utils.js';
 import { initMention } from './mention.js';
 import { initPreview } from './preview.js';
 
@@ -44,6 +45,14 @@ let dom = {};
 let inited = false;
 let sending = false;
 
+// 作者模式内部的三个视图：thread 会话 / shelf 书架 / detail 小说详情。
+let authorView = 'thread';
+// 书架分页与当前打开的小说。
+let shelfPage = 1;
+let shelfTotal = 0;
+const SHELF_PAGE_SIZE = 10;
+let currentNovel = null;
+
 export async function initTextApp(elements) {
   dom = elements;
   if (inited) return;
@@ -55,6 +64,9 @@ export async function initTextApp(elements) {
   initMention(dom);
   initPreview(dom);
   bindGenMode();
+  bindAuthorTabs();
+  bindShelf();
+  bindNovelDetail();
 
   applyMode(dom.mode?.value || MODE.READER);
   await loadProviders();
@@ -64,17 +76,39 @@ function applyMode(mode) {
   const isAuthor = mode === MODE.AUTHOR;
   setHidden(dom.reader, isAuthor);
   setHidden(dom.author, !isAuthor);
-  if (isAuthor) dom.input?.focus();
+  // 侧边栏的作者导航只在作者模式露出
+  dom.shell?.querySelector('[data-text-author-nav]')?.classList.toggle('is-hidden', !isAuthor);
+  if (!isAuthor) return;
+  showAuthorView(authorView);
+  if (authorView === 'shelf') loadShelf();
+  if (authorView === 'thread') dom.input?.focus();
 }
 
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  }[ch]));
+/* ---------- 作者模式内部视图：会话 / 书架 / 详情（导航在侧边栏） ---------- */
+
+function showAuthorView(view) {
+  authorView = view;
+  setHidden(dom.threadView, view !== 'thread');
+  setHidden(dom.shelf, view !== 'shelf');
+  setHidden(dom.novelDetail, view !== 'detail');
+
+  const nav = dom.shell?.querySelector('[data-text-author-nav]');
+  nav?.classList.remove('is-hidden');
+  nav?.querySelectorAll('[data-text-nav]').forEach((button) => {
+    button.classList.toggle('is-active', button.dataset.textNav === view);
+  });
+  // 小说操作区只在详情视图露出
+  dom.shell?.querySelector('[data-text-novel-actions]')?.classList.toggle('is-hidden', view !== 'detail');
+}
+
+function bindAuthorTabs() {
+  dom.shell?.querySelectorAll('[data-text-nav]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const target = button.dataset.textNav;
+      showAuthorView(target);
+      if (target === 'shelf') loadShelf();
+    });
+  });
 }
 
 function fillOptions(select, items, placeholder) {
@@ -185,15 +219,35 @@ async function pollTask(taskId, bubble) {
       return show(bubble, error?.message || '查询任务失败', true);
     }
 
-    if (task?.status === 'success') return show(bubble, task.result_text || '（没有返回内容）');
+    if (task?.status === 'success') {
+      show(bubble, task.result_text || '（没有返回内容）');
+      if (task?.gen_mode === 'outline') {
+        appendMessage('assistant', '提示', '大纲已存入书架，切到「书架」页签可随时查看、改名或编辑。');
+      }
+      return;
+    }
     if (task?.status === 'failed') {
       return show(bubble, `生成失败：${task.fail_reason || '未写明原因'}`, true);
     }
 
-    show(bubble, `${RUNNING_TEXT[task?.status] || '正在处理…'}（任务号 ${taskId}）`);
+    show(bubble, `${progressText(task)}\n任务号 ${taskId}`);
   }
 
   show(bubble, `等待超时，任务仍在处理。任务号 ${taskId}，可稍后在库里按它查看结果。`);
+}
+
+/** 用响应里的 steps 拼一行进度：第 N/M 步 · 步骤标签（状态）。 */
+function progressText(task) {
+  const steps = Array.isArray(task?.steps) ? task.steps : [];
+  if (!steps.length) return RUNNING_TEXT[task?.status] || '正在处理…';
+
+  const doneCount = steps.filter((step) => step.status === 'success').length;
+  const active = steps.find((step) => step.status !== 'success' && step.status !== 'failed') || steps[steps.length - 1];
+  const label = active?.title || `步骤 ${active?.step_index ?? '?'}`;
+  const stateText = active?.status === 'failed'
+    ? `失败：${active?.fail_reason || '未写明原因'}`
+    : (RUNNING_TEXT[active?.status] || '正在处理…');
+  return `第 ${Math.min(doneCount + 1, steps.length)}/${steps.length} 步 · ${label}（${stateText}）`;
 }
 
 function appendNotice(text) {
@@ -235,4 +289,228 @@ function setSending(value) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/* ---------- 书架：列表 / 分页 ---------- */
+
+function bindShelf() {
+  dom.shelf?.querySelector('[data-text-shelf-refresh]')?.addEventListener('click', () => loadShelf());
+  dom.shelf?.querySelector('[data-text-shelf-prev]')?.addEventListener('click', () => {
+    if (shelfPage > 1) { shelfPage -= 1; loadShelf(); }
+  });
+  dom.shelf?.querySelector('[data-text-shelf-next]')?.addEventListener('click', () => {
+    if (shelfPage * SHELF_PAGE_SIZE < shelfTotal) { shelfPage += 1; loadShelf(); }
+  });
+  dom.shelf?.querySelector('[data-text-shelf-list]')?.addEventListener('click', onShelfListClick);
+}
+
+async function loadShelf() {
+  const list = dom.shelf?.querySelector('[data-text-shelf-list]');
+  if (!list) return;
+
+  list.innerHTML = '<p class="text-shelf-empty">加载中…</p>';
+  try {
+    const data = await api(`/api/text/novels?page=${shelfPage}&page_size=${SHELF_PAGE_SIZE}`);
+    shelfTotal = Number(data?.total || 0);
+    const items = Array.isArray(data?.items) ? data.items : [];
+    renderShelfList(list, items);
+  } catch (error) {
+    list.innerHTML = `<p class="text-shelf-empty">${escapeHtml(error?.message || '书架加载失败')}</p>`;
+  }
+  const pageHint = dom.shelf?.querySelector('[data-text-shelf-page]');
+  if (pageHint) {
+    const lastPage = Math.max(1, Math.ceil(shelfTotal / SHELF_PAGE_SIZE));
+    pageHint.textContent = `第 ${shelfPage} / ${lastPage} 页 · 共 ${shelfTotal} 本`;
+  }
+}
+
+function renderShelfList(list, items) {
+  if (!items.length) {
+    list.innerHTML = '<p class="text-shelf-empty">书架还是空的。回「会话」写一段草稿，生成的大纲会自动存进来。</p>';
+    return;
+  }
+  list.innerHTML = items.map((item) => `
+    <div class="text-shelf-item" data-novel-id="${escapeHtml(item.novel_id)}">
+      <button class="text-shelf-open" type="button" data-shelf-action="open" data-novel-id="${escapeHtml(item.novel_id)}">
+        <span class="text-shelf-title">${escapeHtml(item.title || '未命名作品')}</span>
+        <span class="micro">${escapeHtml(formatTime(item.update_time))}</span>
+      </button>
+      <button class="text-shelf-delete" type="button" data-shelf-action="delete" data-novel-id="${escapeHtml(item.novel_id)}" title="删除">✕</button>
+    </div>`).join('');
+}
+
+function formatTime(value) {
+  const time = new Date(value);
+  return Number.isNaN(time.getTime()) ? '' : time.toLocaleString();
+}
+
+async function onShelfListClick(event) {
+  const button = event.target.closest('[data-shelf-action]');
+  if (!button) return;
+  const novelId = button.dataset.novelId;
+  if (!novelId) return;
+
+  if (button.dataset.shelfAction === 'open') return openNovel(novelId);
+
+  if (button.dataset.shelfAction === 'delete') {
+    const novel = button.closest('.text-shelf-item')?.querySelector('.text-shelf-title')?.textContent || '';
+    if (!window.confirm(`确定删除《${novel}》？删除后书架不再显示。`)) return;
+    try {
+      await api(`/api/text/novels/${encodeURIComponent(novelId)}`, { method: 'DELETE' });
+      await loadShelf();
+    } catch (error) {
+      appendMessage('assistant', '提示', error?.message || '删除失败');
+    }
+  }
+}
+
+/* ---------- 小说详情：阅读 / 改名 / 编辑大纲 / 删除 ---------- */
+
+function bindNovelDetail() {
+  // 改名 / 编辑 / 删除三个按钮在侧边栏的「小说操作」区
+  dom.novelDetail?.querySelector('[data-text-novel-back]')?.addEventListener('click', () => {
+    showAuthorView('shelf');
+    loadShelf();
+  });
+  dom.shell?.querySelector('[data-text-novel-rename]')?.addEventListener('click', toggleRenameForm);
+  dom.shell?.querySelector('[data-text-novel-edit]')?.addEventListener('click', toggleOutlineForm);
+  dom.shell?.querySelector('[data-text-novel-delete]')?.addEventListener('click', deleteCurrentNovel);
+  dom.novelDetail?.querySelector('[data-text-novel-rename-form]')?.addEventListener('submit', saveNovelTitle);
+  dom.novelDetail?.querySelector('[data-text-novel-outline-form]')?.addEventListener('submit', saveNovelOutline);
+}
+
+async function openNovel(novelId) {
+  const outline = dom.novelDetail?.querySelector('[data-text-novel-outline]');
+  if (!outline) return;
+  outline.innerHTML = '<p class="text-shelf-empty">加载中…</p>';
+  try {
+    currentNovel = await api(`/api/text/novels/${encodeURIComponent(novelId)}`);
+  } catch (error) {
+    outline.innerHTML = '';
+    appendMessage('assistant', '提示', error?.message || '小说加载失败');
+    return;
+  }
+  renderNovelDetail();
+  showAuthorView('detail');
+}
+
+function renderNovelDetail() {
+  if (!currentNovel) return;
+  const title = dom.novelDetail?.querySelector('[data-text-novel-title]');
+  const meta = dom.novelDetail?.querySelector('[data-text-novel-meta]');
+  const outline = dom.novelDetail?.querySelector('[data-text-novel-outline]');
+  if (title) title.textContent = currentNovel.title || '未命名作品';
+  if (meta) meta.textContent = `更新于 ${formatTime(currentNovel.update_time)}`;
+  if (outline) outline.innerHTML = mdToHtml(currentNovel.outline_text || '（暂无内容）');
+  // 打开详情时收起两块编辑表单，展示阅读态
+  dom.novelDetail?.querySelector('[data-text-novel-rename-form]')?.classList.add('is-hidden');
+  dom.novelDetail?.querySelector('[data-text-novel-outline-form]')?.classList.add('is-hidden');
+}
+
+function toggleRenameForm() {
+  const form = dom.novelDetail?.querySelector('[data-text-novel-rename-form]');
+  if (!form) return;
+  const input = form.querySelector('[data-text-novel-title-input]');
+  form.classList.toggle('is-hidden');
+  if (!form.classList.contains('is-hidden')) {
+    input.value = currentNovel?.title || '';
+    input.focus();
+  }
+  dom.novelDetail?.querySelector('[data-text-novel-outline-form]')?.classList.add('is-hidden');
+}
+
+function toggleOutlineForm() {
+  const form = dom.novelDetail?.querySelector('[data-text-novel-outline-form]');
+  if (!form) return;
+  const textarea = form.querySelector('[data-text-novel-outline-input]');
+  form.classList.toggle('is-hidden');
+  if (!form.classList.contains('is-hidden')) {
+    textarea.value = currentNovel?.outline_text || '';
+    textarea.focus();
+  }
+  dom.novelDetail?.querySelector('[data-text-novel-rename-form]')?.classList.add('is-hidden');
+}
+
+async function saveNovelTitle(event) {
+  event.preventDefault();
+  if (!currentNovel) return;
+  const input = dom.novelDetail?.querySelector('[data-text-novel-title-input]');
+  const title = (input?.value || '').trim();
+  if (!title) return appendMessage('assistant', '提示', '小说名称不能为空。');
+  try {
+    const data = await api(`/api/text/novels/${encodeURIComponent(currentNovel.novel_id)}/title`, {
+      method: 'PUT',
+      body: JSON.stringify({ title })
+    });
+    currentNovel.title = data?.title || title;
+    renderNovelDetail();
+    dom.novelDetail?.querySelector('[data-text-novel-rename-form]')?.classList.add('is-hidden');
+  } catch (error) {
+    appendMessage('assistant', '提示', error?.message || '改名失败');
+  }
+}
+
+async function saveNovelOutline(event) {
+  event.preventDefault();
+  if (!currentNovel) return;
+  const textarea = dom.novelDetail?.querySelector('[data-text-novel-outline-input]');
+  const outlineText = (textarea?.value || '').trim();
+  if (!outlineText) return appendMessage('assistant', '提示', '大纲正文不能为空。');
+  try {
+    const data = await api(`/api/text/novels/${encodeURIComponent(currentNovel.novel_id)}/outline`, {
+      method: 'PUT',
+      body: JSON.stringify({ outline_text: outlineText })
+    });
+    currentNovel.outline_text = data?.outline_text || outlineText;
+    if (data?.title) currentNovel.title = data.title;
+    renderNovelDetail();
+    dom.novelDetail?.querySelector('[data-text-novel-outline-form]')?.classList.add('is-hidden');
+  } catch (error) {
+    appendMessage('assistant', '提示', error?.message || '保存大纲失败');
+  }
+}
+
+async function deleteCurrentNovel() {
+  if (!currentNovel) return;
+  const title = currentNovel.title || '未命名作品';
+  if (!window.confirm(`确定删除《${title}》？删除后书架不再显示。`)) return;
+  try {
+    await api(`/api/text/novels/${encodeURIComponent(currentNovel.novel_id)}`, { method: 'DELETE' });
+    currentNovel = null;
+    showAuthorView('shelf');
+    loadShelf();
+  } catch (error) {
+    appendMessage('assistant', '提示', error?.message || '删除失败');
+  }
+}
+
+/* ---------- 极简 Markdown 渲染：先整体转义，再按行识别标题 / 引用 / 列表 / 段落 ---------- */
+
+function mdToHtml(md) {
+  const lines = String(md ?? '').replace(/\r\n/g, '\n').split('\n');
+  const out = [];
+  let listOpen = false;
+  const closeList = () => {
+    if (listOpen) { out.push('</ul>'); listOpen = false; }
+  };
+
+  for (const raw of lines) {
+    const line = escapeHtml(raw.trimEnd());
+    const text = line.trim();
+    if (!text) { closeList(); continue; }
+    if (text.startsWith('### ')) { closeList(); out.push(`<h3>${text.slice(4)}</h3>`); continue; }
+    if (text.startsWith('## ')) { closeList(); out.push(`<h2>${text.slice(3)}</h2>`); continue; }
+    if (text.startsWith('# ')) { closeList(); out.push(`<h1>${text.slice(2)}</h1>`); continue; }
+    // escapeHtml 已把 > 变成 &gt;
+    if (text.startsWith('&gt; ')) { closeList(); out.push(`<blockquote>${text.slice(5)}</blockquote>`); continue; }
+    if (text.startsWith('- ')) {
+      if (!listOpen) { out.push('<ul>'); listOpen = true; }
+      out.push(`<li>${text.slice(2)}</li>`);
+      continue;
+    }
+    closeList();
+    out.push(`<p>${text}</p>`);
+  }
+  closeList();
+  return out.join('\n');
 }

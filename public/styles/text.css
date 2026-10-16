@@ -9,7 +9,279 @@
   height: calc(100vh - 56px);
 }
 
-/* 对话流与输入区按 4:1 分配高度 —— 输入框即底部的五分之一。 */
+/* ---------- 侧边栏：作者导航与小说操作 ---------- */
+
+/* 会话/书架导航与改名/编辑/删除按钮都收进侧边栏，主区域只留内容。
+   按钮通栏、文字不换行 —— 之前挤在主区右上角换行成竖条，就是没锁死这个。 */
+.text-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.text-nav.is-hidden { display: none; }
+
+.text-nav-btn {
+  width: 100%;
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.text-nav-btn:hover {
+  border-color: color-mix(in srgb, var(--accent-text), var(--line) 50%);
+  color: var(--text);
+}
+
+.text-nav-btn.is-active {
+  border-color: color-mix(in srgb, var(--accent-text), var(--line) 40%);
+  background: color-mix(in srgb, var(--accent-text), transparent 88%);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.text-nav-btn.is-danger:hover {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger), var(--line) 45%);
+}
+
+/* 会话视图：包住对话流与输入区，保持原有 4:1 高度分配 */
+.text-thread-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.text-thread-view.is-hidden,
+.text-shelf.is-hidden,
+.text-novel-detail.is-hidden { display: none; }
+
+/* ---------- 书架 ---------- */
+
+.text-shelf,
+.text-novel-detail {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.text-shelf-toolbar,
+.text-novel-toolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.text-shelf-pager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.text-shelf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.text-shelf-item {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.text-shelf-open {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.text-shelf-open:hover {
+  border-color: color-mix(in srgb, var(--accent-text), var(--line) 50%);
+}
+
+.text-shelf-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.text-shelf-delete {
+  flex: none;
+  width: 42px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-strong);
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.text-shelf-delete:hover {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger), var(--line) 45%);
+}
+
+.text-shelf-empty {
+  padding: 24px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* ---------- 小说详情 ---------- */
+
+.text-novel-title {
+  margin: 0;
+  font-size: 22px;
+  color: var(--text);
+}
+
+.text-shelf-toolbar .ghost-btn,
+.text-shelf-pager .ghost-btn,
+.text-novel-toolbar .ghost-btn {
+  min-height: 36px;
+  height: 36px;
+  width: auto;
+  margin-top: 0;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.text-shelf-pager {
+  margin-left: auto;
+}
+
+.text-shelf-pager .micro {
+  white-space: nowrap;
+}
+
+.text-shelf-toolbar .ghost-btn:hover,
+.text-shelf-pager .ghost-btn:hover,
+.text-novel-toolbar .ghost-btn:hover {
+  border-color: color-mix(in srgb, var(--accent-text), var(--line) 55%);
+}
+
+/* 行内编辑表单：改名 / 编辑大纲共用 */
+.text-inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+
+.text-inline-form.is-hidden { display: none; }
+
+.text-inline-input,
+.text-outline-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+.text-outline-input {
+  line-height: 1.7;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.text-inline-input:focus,
+.text-outline-input:focus {
+  border-color: color-mix(in srgb, var(--accent-text), var(--line) 50%);
+}
+
+.text-inline-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ---------- 大纲正文：轻量 Markdown 渲染 ---------- */
+
+.text-md {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.text-md h1 {
+  margin: 6px 0 10px;
+  font-size: 22px;
+}
+
+.text-md h2 {
+  margin: 18px 0 8px;
+  font-size: 17px;
+  color: var(--accent-text);
+}
+
+.text-md h3 {
+  margin: 14px 0 6px;
+  font-size: 15px;
+}
+
+.text-md p {
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.text-md blockquote {
+  margin: 0 0 10px;
+  padding: 6px 14px;
+  border-left: 3px solid color-mix(in srgb, var(--accent-text), var(--line) 50%);
+  color: var(--muted);
+}
+
+.text-md ul {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+
+.text-md li {
+  margin-bottom: 4px;
+}
+
+/* ---------- 对话流与输入区按 4:1 分配高度 —— 输入框即底部的五分之一。 ---------- */
 .text-thread {
   flex: 4;
   min-height: 0;

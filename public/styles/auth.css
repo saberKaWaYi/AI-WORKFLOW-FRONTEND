@@ -117,8 +117,8 @@
   outline: none;
 }
 
-.auth-form .primary-btn, .ghost-btn { width: 100%; margin-top: 4px; }
-.ghost-btn { margin-top: 12px; }
+.auth-form .primary-btn, .auth-form .ghost-btn { width: 100%; margin-top: 4px; }
+.auth-form .ghost-btn { margin-top: 12px; }
 .form-message { min-height: 20px; margin: 12px 0 0; color: var(--danger); font-size: 13px; }
 
 .system-data .primary-btn, .system-data .tab.is-active {

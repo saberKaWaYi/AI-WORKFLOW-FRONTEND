@@ -2,6 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import express from "express";
+import compression from "compression";
 import { createClient } from "redis";
 import { initSchema } from "./db.js";
 import { createAdminRouter } from "./admin/routes.js";
@@ -31,11 +32,16 @@ const sessionManager = createSessionManager({
 });
 
 const app = express();
+// 响应 gzip 压缩：大纲正文、拓扑数据这类 JSON 体积能压掉七成以上
+app.use(compression());
+app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public"), {
   extensions: ["html"],
+  // no-cache：不带 max-age，浏览器每次拿 etag 回源验证，命中就 304 —— 改完代码刷新即生效，也不用整文件重下
   setHeaders(res, filePath) {
     if (filePath.endsWith(".js")) res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache");
   }
 }));
 
@@ -66,11 +72,13 @@ async function proxy(url, res, options = {}) {
 
 // P1 访问控制：数据接口必须已登录（type === "user"），游客/未登录直接 401。
 // 修复此前"登录系统形同虚设"的漏洞——数据代理注册在登录校验之前、且不校验 session。
+// 会话读一次就挂在 req 上，后面的 handler 直接用 req.session，省掉每请求第二次 Redis 往返。
 async function requireUser(req, res, next) {
   const session = await sessionManager.readSession(req);
   if (!session || session.type !== "user") {
     return res.status(401).json({ message: "请先登录后再访问数据" });
   }
+  req.session = session;
   next();
 }
 
@@ -124,9 +132,8 @@ app.get("/api/tasks/:messageId", requireUser, (req, res) => {
 // 文本系统作者模式：厂商 / 模型下拉框。
 // 数据由 TEXT-GENERATE 提供（它连 MySQL 读该用户的 model_providers、从自身配置读模型），
 // 本服务只按会话身份转发，不查询数据库。
-app.get("/api/text/providers", requireUser, async (req, res) => {
-  const session = await sessionManager.readSession(req);
-  const userId = session?.userId;
+app.get("/api/text/providers", requireUser, (req, res) => {
+  const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ message: "请先登录后再访问数据" });
   return proxy(`${textGenerateApi}/providers?${new URLSearchParams({ user_id: String(userId) })}`, res);
 });
@@ -138,9 +145,8 @@ app.get("/api/text/models", requireUser, (req, res) => {
 
 // 提交一次生成。user_id 由会话注入、前端不传，避免替别人提交任务。
 // 生成是异步的（worker 消费子表），这里只返回 task_id，结果靠下面的查询接口轮询。
-app.post("/api/text/tasks", requireUser, async (req, res) => {
-  const session = await sessionManager.readSession(req);
-  const userId = session?.userId;
+app.post("/api/text/tasks", requireUser, (req, res) => {
+  const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ message: "请先登录后再访问数据" });
 
   const { provider, model, gen_mode, draft_text } = req.body || {};
@@ -156,15 +162,79 @@ app.post("/api/text/tasks", requireUser, async (req, res) => {
 
 // 查询任务：user_id 由会话注入。TEXT-GENERATE 只返回本人的任务，
 // 别人的任务号会得到 404，与"任务不存在"不作区分。
-app.get("/api/text/tasks/:taskId", requireUser, async (req, res) => {
-  const session = await sessionManager.readSession(req);
-  const userId = session?.userId;
+app.get("/api/text/tasks/:taskId", requireUser, (req, res) => {
+  const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ message: "请先登录后再访问数据" });
 
   const { taskId } = req.params;
   if (!taskId) return res.status(400).json({ message: "taskId is required" });
   const query = new URLSearchParams({ user_id: String(userId) });
   return proxy(`${textGenerateApi}/text/tasks/${encodeURIComponent(taskId)}?${query}`, res);
+});
+
+// 小说模块（书架）：五个接口全部由会话注入 user_id，前端不传，防越权。
+// requireUser 已把会话挂在 req.session 上，这里不再重复读 Redis。
+function novelSession(req, res) {
+  const userId = req.session?.userId;
+  if (!userId) {
+    res.status(401).json({ message: "请先登录后再访问数据" });
+    return null;
+  }
+  return userId;
+}
+
+app.get("/api/text/novels", requireUser, async (req, res) => {
+  const userId = novelSession(req, res);
+  if (!userId) return;
+
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(50, Math.max(1, Number(req.query.page_size) || 10));
+  const query = new URLSearchParams({
+    user_id: String(userId),
+    page: String(page),
+    page_size: String(pageSize)
+  });
+  return proxy(`${textGenerateApi}/text/novels?${query}`, res);
+});
+
+app.get("/api/text/novels/:novelId", requireUser, async (req, res) => {
+  const userId = novelSession(req, res);
+  if (!userId) return;
+
+  const query = new URLSearchParams({ user_id: String(userId) });
+  return proxy(`${textGenerateApi}/text/novels/${encodeURIComponent(req.params.novelId)}?${query}`, res);
+});
+
+app.delete("/api/text/novels/:novelId", requireUser, async (req, res) => {
+  const userId = novelSession(req, res);
+  if (!userId) return;
+
+  const query = new URLSearchParams({ user_id: String(userId) });
+  return proxy(`${textGenerateApi}/text/novels/${encodeURIComponent(req.params.novelId)}?${query}`, res, { method: "DELETE" });
+});
+
+app.put("/api/text/novels/:novelId/title", requireUser, async (req, res) => {
+  const userId = novelSession(req, res);
+  if (!userId) return;
+
+  const { title } = req.body || {};
+  if (!title || !String(title).trim()) return res.status(400).json({ message: "title is required" });
+  return proxy(`${textGenerateApi}/text/novels/${encodeURIComponent(req.params.novelId)}/title`, res, {
+    method: "PUT",
+    body: { user_id: userId, title: String(title).trim() }
+  });
+});
+
+app.put("/api/text/novels/:novelId/outline", requireUser, async (req, res) => {
+  const userId = novelSession(req, res);
+  if (!userId) return;
+
+  const { outline_text } = req.body || {};
+  if (!outline_text || !String(outline_text).trim()) return res.status(400).json({ message: "outline_text is required" });
+  return proxy(`${textGenerateApi}/text/novels/${encodeURIComponent(req.params.novelId)}/outline`, res, {
+    method: "PUT",
+    body: { user_id: userId, outline_text: String(outline_text) }
+  });
 });
 
 app.use("/api/auth", createAuthRouter({ sessionManager }));
