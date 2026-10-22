@@ -213,15 +213,18 @@ app.delete("/api/text/novels/:novelId", requireUser, async (req, res) => {
   return proxy(`${textGenerateApi}/text/novels/${encodeURIComponent(req.params.novelId)}?${query}`, res, { method: "DELETE" });
 });
 
+// TEXT-GENERATE 侧只有一个 PATCH /text/novels/{id}（title、outline_text 都可以改），
+// 这里保留「改名 / 改内容」两个前端路由，内部都收敛成同一个 PATCH。
 app.put("/api/text/novels/:novelId/title", requireUser, async (req, res) => {
   const userId = novelSession(req, res);
   if (!userId) return;
 
   const { title } = req.body || {};
   if (!title || !String(title).trim()) return res.status(400).json({ message: "title is required" });
-  return proxy(`${textGenerateApi}/text/novels/${encodeURIComponent(req.params.novelId)}/title`, res, {
-    method: "PUT",
-    body: { user_id: userId, title: String(title).trim() }
+  const query = new URLSearchParams({ user_id: String(userId) });
+  return proxy(`${textGenerateApi}/text/novels/${encodeURIComponent(req.params.novelId)}?${query}`, res, {
+    method: "PATCH",
+    body: { title: String(title).trim() }
   });
 });
 
@@ -231,9 +234,10 @@ app.put("/api/text/novels/:novelId/outline", requireUser, async (req, res) => {
 
   const { outline_text } = req.body || {};
   if (!outline_text || !String(outline_text).trim()) return res.status(400).json({ message: "outline_text is required" });
-  return proxy(`${textGenerateApi}/text/novels/${encodeURIComponent(req.params.novelId)}/outline`, res, {
-    method: "PUT",
-    body: { user_id: userId, outline_text: String(outline_text) }
+  const query = new URLSearchParams({ user_id: String(userId) });
+  return proxy(`${textGenerateApi}/text/novels/${encodeURIComponent(req.params.novelId)}?${query}`, res, {
+    method: "PATCH",
+    body: { outline_text: String(outline_text) }
   });
 });
 

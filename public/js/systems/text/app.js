@@ -220,8 +220,10 @@ async function pollTask(taskId, bubble) {
     }
 
     if (task?.status === 'success') {
-      show(bubble, task.result_text || '（没有返回内容）');
-      if (task?.gen_mode === 'outline') {
+      // 轮询接口只给 novel_id，正文要再查一次小说（避免每 2 秒搬几 KB 正文）
+      const novel = task?.novel_id ? await fetchNovel(task.novel_id) : null;
+      show(bubble, novel?.outline_text || '（没有返回内容）');
+      if (novel) {
         appendMessage('assistant', '提示', '大纲已存入书架，切到「书架」页签可随时查看、改名或编辑。');
       }
       return;
@@ -236,18 +238,27 @@ async function pollTask(taskId, bubble) {
   show(bubble, `等待超时，任务仍在处理。任务号 ${taskId}，可稍后在库里按它查看结果。`);
 }
 
-/** 用响应里的 steps 拼一行进度：第 N/M 步 · 步骤标签（状态）。 */
+/** 用响应里的 subtasks 拼一行进度：第 N/M 步 · 本轮标题（状态）。 */
 function progressText(task) {
-  const steps = Array.isArray(task?.steps) ? task.steps : [];
+  const steps = Array.isArray(task?.subtasks) ? task.subtasks : [];
   if (!steps.length) return RUNNING_TEXT[task?.status] || '正在处理…';
 
   const doneCount = steps.filter((step) => step.status === 'success').length;
   const active = steps.find((step) => step.status !== 'success' && step.status !== 'failed') || steps[steps.length - 1];
-  const label = active?.title || `步骤 ${active?.step_index ?? '?'}`;
+  const label = active?.title || active?.subtask_type || '处理中';
   const stateText = active?.status === 'failed'
     ? `失败：${active?.fail_reason || '未写明原因'}`
     : (RUNNING_TEXT[active?.status] || '正在处理…');
   return `第 ${Math.min(doneCount + 1, steps.length)}/${steps.length} 步 · ${label}（${stateText}）`;
+}
+
+/** 按 novel_id 取小说正文；失败返回 null，不打断轮询结果展示。 */
+async function fetchNovel(novelId) {
+  try {
+    return await api(`/api/text/novels/${encodeURIComponent(novelId)}`);
+  } catch (error) {
+    return null;
+  }
 }
 
 function appendNotice(text) {

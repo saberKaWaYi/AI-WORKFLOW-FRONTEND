@@ -1,9 +1,10 @@
 /**
- * 输入预览：把文本框里的 `@` 引用渲染成可点击的跳转链接。
+ * 输入预览：把文本框里的 `@` 引用列成可点击的跳转入口。
  *
  * 为什么不直接改输入框：textarea 只能放纯文本，塞不进 <a>。
  * 换成 contenteditable 就要重写输入法、选区、删字整套逻辑（前面两个 bug 都在那片雷区）。
- * 所以保持输入框原样，在它上方另起一块只读预览，专管「看得见、点得动」。
+ * 所以保持输入框原样，在它上方另起一条只读的引用条 —— 只显示引用本身，不复制正文，
+ * 否则看起来就像输入框被写了两遍。
  *
  * 引用形态：
  *   @pcr         -> 数据展示系统，pcr 业务首页
@@ -28,6 +29,7 @@ export function initPreview(elements) {
   // 引用是提交给后端的内容，点击仅用于「看一眼」，因此不阻止默认行为，
   // 而是接管 click 自己跳转 —— 顺带避免预览层的点击把光标从输入框抢走。
   dom.preview.addEventListener('click', onPreviewClick);
+  render();
 }
 
 function onPreviewClick(event) {
@@ -39,38 +41,38 @@ function onPreviewClick(event) {
     : `#${link.dataset.refTarget}`;
 }
 
-function render() {
-  const text = dom.input.value;
-  // 没有引用时不显示：预览条只用来"点引用"，没引用就是纯占位。
-  if (!text.trim() || !REF_PATTERN.test(text)) {
-    REF_PATTERN.lastIndex = 0;
-    dom.preview.classList.add('is-hidden');
-    dom.preview.innerHTML = '';
-    return;
-  }
-  REF_PATTERN.lastIndex = 0;
-
-  dom.preview.innerHTML = toHtml(text);
-  dom.preview.classList.remove('is-hidden');
-}
-
-/** 把纯文本转成「转义后的文本 + 引用链接」的 HTML。 */
-export function toHtml(text) {
-  let html = '';
-  let cursor = 0;
+/** 从整段文本里取出引用：按首次出现去重，保持原有顺序。 */
+function collectRefs(text) {
+  const refs = [];
+  const seen = new Set();
 
   for (const match of String(text).matchAll(REF_PATTERN)) {
     const [raw, business, node] = match;
     // `@` 紧贴非空白字符时不算引用（如邮箱），跳过。
     const prev = text[match.index - 1];
     if (match.index > 0 && prev && !/\s/.test(prev)) continue;
+    if (seen.has(raw)) continue;
 
-    html += escapeHtml(text.slice(cursor, match.index));
-    html += renderRef(raw, business, node);
-    cursor = match.index + raw.length;
+    seen.add(raw);
+    refs.push({ raw, business, node });
   }
-  html += escapeHtml(text.slice(cursor));
-  return html;
+  return refs;
+}
+
+function render() {
+  const refs = collectRefs(dom.input.value);
+  // 没有引用时整条隐藏：这条只用来点引用，正文就在下面那个输入框里。
+  if (!refs.length) {
+    dom.preview.classList.add('is-hidden');
+    dom.preview.innerHTML = '';
+    return;
+  }
+
+  dom.preview.innerHTML = [
+    '<span class="text-preview-hint">引用</span>',
+    ...refs.map((ref) => renderRef(ref.raw, ref.business, ref.node))
+  ].join('');
+  dom.preview.classList.remove('is-hidden');
 }
 
 function renderRef(raw, business, node) {

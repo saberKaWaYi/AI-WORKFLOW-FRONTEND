@@ -385,6 +385,20 @@
 
 .text-ref:hover { text-decoration: underline; }
 
+/* 预览条现在只放引用：一行 chip 排布，不再复制正文。 */
+.text-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  white-space: normal;
+}
+
+.text-preview-hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .text-composer .primary-btn,
 .text-composer .ghost-btn {
   position: absolute;
