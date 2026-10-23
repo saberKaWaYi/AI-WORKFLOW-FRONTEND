@@ -149,14 +149,15 @@ app.post("/api/text/tasks", requireUser, (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ message: "请先登录后再访问数据" });
 
-  const { provider, model, gen_mode, draft_text } = req.body || {};
+  const { provider, model, gen_mode, draft_text, novel_id } = req.body || {};
   if (!provider || !model || !gen_mode || !draft_text) {
     return res.status(400).json({ message: "provider, model, gen_mode and draft_text are required" });
   }
 
+  // novel_id 可选：带上 = 在已有小说上修订大纲；不传 = 新建小说
   return proxy(`${textGenerateApi}/text/tasks`, res, {
     method: "POST",
-    body: { user_id: userId, provider, model, gen_mode, draft_text }
+    body: { user_id: userId, provider, model, gen_mode, draft_text, novel_id: novel_id ?? null }
   });
 });
 
@@ -203,6 +204,18 @@ app.get("/api/text/novels/:novelId", requireUser, async (req, res) => {
 
   const query = new URLSearchParams({ user_id: String(userId) });
   return proxy(`${textGenerateApi}/text/novels/${encodeURIComponent(req.params.novelId)}?${query}`, res);
+});
+
+// 完全重新生成：用原草稿与引用从零重跑，成功后覆盖这本小说的大纲。
+// 返回任务号，前端照旧走 /api/text/tasks/:taskId 轮询。
+app.post("/api/text/novels/:novelId/regenerate", requireUser, async (req, res) => {
+  const userId = novelSession(req, res);
+  if (!userId) return;
+
+  const query = new URLSearchParams({ user_id: String(userId) });
+  return proxy(`${textGenerateApi}/text/novels/${encodeURIComponent(req.params.novelId)}/regenerate?${query}`, res, {
+    method: "POST"
+  });
 });
 
 app.delete("/api/text/novels/:novelId", requireUser, async (req, res) => {

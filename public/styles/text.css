@@ -281,6 +281,72 @@
   margin-bottom: 4px;
 }
 
+.text-md ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+
+/* 模型输出常用 **粗体** 强调人物名与结论，缺这条会直接显示星号。 */
+.text-md strong {
+  font-weight: 650;
+  color: var(--text);
+}
+
+.text-md code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--text), transparent 92%);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.text-md hr {
+  margin: 14px 0;
+  border: none;
+  border-top: 1px dashed var(--line);
+}
+
+/* 四级及以下标题：模型常用 #### 分小节，之前会原样露出井号。 */
+.text-md h4 {
+  margin: 12px 0 6px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.text-md h5,
+.text-md h6 {
+  margin: 10px 0 5px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* 表格：技能 / 效果这类对照，横排读比堆段落清楚得多。 */
+.text-md table {
+  width: 100%;
+  margin: 0 0 12px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.text-md th,
+.text-md td {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+.text-md th {
+  background: color-mix(in srgb, var(--text), transparent 94%);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.text-md tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--text), transparent 97%);
+}
+
 /* ---------- 对话流与输入区按 4:1 分配高度 —— 输入框即底部的五分之一。 ---------- */
 .text-thread {
   flex: 4;

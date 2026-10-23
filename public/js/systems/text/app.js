@@ -44,6 +44,7 @@ const RUNNING_TEXT = {
 let dom = {};
 let inited = false;
 let sending = false;
+let regenerating = false;
 
 // 作者模式内部的三个视图：thread 会话 / shelf 书架 / detail 小说详情。
 let authorView = 'thread';
@@ -386,6 +387,7 @@ function bindNovelDetail() {
   dom.shell?.querySelector('[data-text-novel-rename]')?.addEventListener('click', toggleRenameForm);
   dom.shell?.querySelector('[data-text-novel-edit]')?.addEventListener('click', toggleOutlineForm);
   dom.shell?.querySelector('[data-text-novel-delete]')?.addEventListener('click', deleteCurrentNovel);
+  dom.shell?.querySelector('[data-text-novel-regenerate]')?.addEventListener('click', regenerateCurrentNovel);
   dom.novelDetail?.querySelector('[data-text-novel-rename-form]')?.addEventListener('submit', saveNovelTitle);
   dom.novelDetail?.querySelector('[data-text-novel-outline-form]')?.addEventListener('submit', saveNovelOutline);
 }
@@ -495,32 +497,126 @@ async function deleteCurrentNovel() {
   }
 }
 
+/** 完全重新生成：用原草稿与引用从零重跑，成功后覆盖当前大纲。 */
+async function regenerateCurrentNovel() {
+  if (!currentNovel || regenerating) return;
+
+  const title = currentNovel.title || '未命名作品';
+  if (!window.confirm(`确定重新生成《${title}》的大纲？\n将使用最初的草稿从零重跑，现有大纲会被覆盖。`)) return;
+
+  regenerating = true;
+  const button = dom.shell?.querySelector('[data-text-novel-regenerate]');
+  const originalText = button?.textContent || '';
+  if (button) { button.disabled = true; button.textContent = '重新生成中…'; }
+
+  try {
+    const created = await api(`/api/text/novels/${encodeURIComponent(currentNovel.novel_id)}/regenerate`, { method: 'POST' });
+    appendMessage('assistant', '提示', `已开始重新生成《${title}》，完成后大纲自动覆盖。`);
+
+    // 轮询该任务，成功后刷新详情与书架
+    for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt += 1) {
+      if (attempt > 0) await sleep(POLL_INTERVAL_MS);
+      let task;
+      try {
+        task = await api(`/api/text/tasks/${encodeURIComponent(created?.task_id)}`);
+      } catch (error) {
+        appendMessage('assistant', '提示', error?.message || '查询重新生成进度失败');
+        return;
+      }
+      if (task?.status === 'success') {
+        await openNovel(currentNovel.novel_id);
+        loadShelf();
+        appendMessage('assistant', '提示', '重新生成完成，大纲已覆盖。');
+        return;
+      }
+      if (task?.status === 'failed') {
+        appendMessage('assistant', '提示', `重新生成失败：${task.fail_reason || '未写明原因'}`);
+        return;
+      }
+    }
+    appendMessage('assistant', '提示', '重新生成仍在进行，稍后刷新书架即可看到新大纲。');
+  } catch (error) {
+    appendMessage('assistant', '提示', error?.message || '重新生成失败');
+  } finally {
+    regenerating = false;
+    if (button) { button.disabled = false; button.textContent = originalText; }
+  }
+}
+
 /* ---------- 极简 Markdown 渲染：先整体转义，再按行识别标题 / 引用 / 列表 / 段落 ---------- */
+
+/**
+ * 行内标记：**粗体** 与 `代码`。
+ * 必须在 escapeHtml 之后调用 —— 此时文本里已无原始 HTML，替换出来的标签是唯一的标签来源。
+ */
+function inline(text) {
+  return text
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+}
+
+/** 表格行：`|a|b|`；表头分隔行：`|---|:--:|`。 */
+const TABLE_ROW = /^\|.*\|$/;
+const TABLE_SEP = /^\|\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|$/;
+
+function splitCells(row) {
+  return row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cell.trim());
+}
 
 function mdToHtml(md) {
   const lines = String(md ?? '').replace(/\r\n/g, '\n').split('\n');
   const out = [];
-  let listOpen = false;
+  // 'ul' | 'ol' | null —— 有序与无序各开各的，遇到类型切换先收口。
+  let listOpen = null;
   const closeList = () => {
-    if (listOpen) { out.push('</ul>'); listOpen = false; }
+    if (listOpen) { out.push(`</${listOpen}>`); listOpen = null; }
   };
 
-  for (const raw of lines) {
-    const line = escapeHtml(raw.trimEnd());
-    const text = line.trim();
+  for (let i = 0; i < lines.length; i += 1) {
+    const text = escapeHtml(lines[i].trimEnd()).trim();
     if (!text) { closeList(); continue; }
-    if (text.startsWith('### ')) { closeList(); out.push(`<h3>${text.slice(4)}</h3>`); continue; }
-    if (text.startsWith('## ')) { closeList(); out.push(`<h2>${text.slice(3)}</h2>`); continue; }
-    if (text.startsWith('# ')) { closeList(); out.push(`<h1>${text.slice(2)}</h1>`); continue; }
-    // escapeHtml 已把 > 变成 &gt;
-    if (text.startsWith('&gt; ')) { closeList(); out.push(`<blockquote>${text.slice(5)}</blockquote>`); continue; }
+
+    // 表格：当前行是 |…|，下一行是分隔行 —— 才认成表，避免把竖线当普通段落。
+    if (TABLE_ROW.test(text) && i + 1 < lines.length && TABLE_SEP.test(escapeHtml(lines[i + 1].trim()))) {
+      closeList();
+      const head = splitCells(text).map((cell) => `<th>${inline(cell)}</th>`).join('');
+      const rows = [];
+      i += 2;
+      while (i < lines.length) {
+        const body = escapeHtml(lines[i].trimEnd()).trim();
+        if (!TABLE_ROW.test(body)) { i -= 1; break; }
+        rows.push(`<tr>${splitCells(body).map((cell) => `<td>${inline(cell)}</td>`).join('')}</tr>`);
+        i += 1;
+      }
+      out.push(`<table><thead><tr>${head}</tr></thead><tbody>${rows.join('')}</tbody></table>`);
+      continue;
+    }
+
+    // 标题 1~6 级：#### 这类四级标题此前会原样露出井号。
+    const heading = text.match(/^(#{1,6})\s+(.*)$/);
+    if (heading) {
+      const level = heading[1].length;
+      closeList();
+      out.push(`<h${level}>${inline(heading[2])}</h${level}>`);
+      continue;
+    }
+
+    if (text.startsWith('&gt; ')) { closeList(); out.push(`<blockquote>${inline(text.slice(5))}</blockquote>`); continue; }
+    if (/^(-{3,}|\*{3,})$/.test(text)) { closeList(); out.push('<hr>'); continue; }
     if (text.startsWith('- ')) {
-      if (!listOpen) { out.push('<ul>'); listOpen = true; }
-      out.push(`<li>${text.slice(2)}</li>`);
+      if (listOpen !== 'ul') { closeList(); out.push('<ul>'); listOpen = 'ul'; }
+      out.push(`<li>${inline(text.slice(2))}</li>`);
+      continue;
+    }
+    // 1. / 1) 开头视为有序列表；编号本身丢弃，交给 <ol> 重排。
+    const ordered = text.match(/^\d{1,2}[.)]\s+(.*)$/);
+    if (ordered) {
+      if (listOpen !== 'ol') { closeList(); out.push('<ol>'); listOpen = 'ol'; }
+      out.push(`<li>${inline(ordered[1])}</li>`);
       continue;
     }
     closeList();
-    out.push(`<p>${text}</p>`);
+    out.push(`<p>${inline(text)}</p>`);
   }
   closeList();
   return out.join('\n');
